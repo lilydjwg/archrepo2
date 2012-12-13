@@ -19,14 +19,15 @@ enable_pretty_logging(logging.DEBUG)
 
 # FIXME: 如果一个软件包消失了，那么如果它在仓库数据库里，它就应当从数据库删除。否则不应该
 
-class ActionInfo:
-  def __init__(self, path, action):
-    self.pkginfo = archpkg.parsePkgName(path)
+class ActionInfo(archpkg.PkgNameInfo):
+  def __new__(cls, path, action, four=None, five=None):
+    if four is not None:
+      return super().__new__(cls, path, action, four, five)
+    file = os.path.split(path)[1]
+    self = cls.parseFilename(file)
     self.action = action
     self.path = path
-
-  def __getattr__(self, name):
-    return getattr(self.pkginfo, name)
+    return self
 
   def __repr__(self):
     return '<ActionInfo: %s %s>' % (self.action, self.path)
@@ -48,15 +49,15 @@ class RepoMan:
     self._command_remove = config.get('command-remove', 'repo-remove')
     self._wait_time = config.getint('wait-time', 10)
 
-  def queue_command(self, cmd):
-    self._cmd_queue.put(cmd)
+  def queue_command(self, cmd, callbacks=None):
+    self._cmd_queue.put((cmd, callbacks))
     if not self._cmd_running:
       self.run_command()
 
-  def run_command(self, status=0):
+  def run_command(self):
     self.__class__._cmd_running = True
     try:
-      cmd = self._cmd_queue.get_nowait()
+      cmd, callbacks = self._cmd_queue.get_nowait()
     except queue.Empty:
       self.__class__._cmd_running = False
       return
@@ -64,23 +65,31 @@ class RepoMan:
     logging.info('Running cmd: %r', cmd)
     # have to specify io_loop or we'll get error tracebacks
     p = tornado.process.Subprocess(cmd, io_loop=self._ioloop)
-    p.set_exit_callback(self.run_command)
+    p.set_exit_callback(partial(self.command_done, callbacks))
 
-  def _do_cmd(self, cmd, items):
+  def command_done(self, callbacks, status):
+    if status == 0 and callbacks:
+      for cb in callbacks:
+        cb()
+    self.run_command()
+
+  def _do_cmd(self, cmd, items, callbacks):
     cmd1 = [cmd, self._db_name]
     cmd1.extend(items)
     cmd2 = [cmd, '-f', self._files_name]
     cmd2.extend(items)
     self.queue_command(cmd1)
-    self.queue_command(cmd2)
+    self.queue_command(cmd2, callbacks)
 
   def _do_add(self, toadd):
     if toadd:
-      self._do_cmd(self._command_add, toadd)
+      files, callbacks = zip(*toadd)
+      self._do_cmd(self._command_add, files, callbacks)
 
   def _do_remove(self, toremove):
     if toremove:
-      self._do_cmd(self._command_remove, toremove)
+      files, callbacks = zip(*toremove)
+      self._do_cmd(self._command_remove, files, callbacks)
 
   def add_action(self, action):
     logging.info('Adding action %r to db %r', action, self._db_name)
@@ -111,8 +120,8 @@ class RepoMan:
         else:
           # take the later action
           actiondict[act.name] = act
-    toadd = [x.path for x in actiondict.values() if x.action == 'add']
-    toremove = [x.name for x in actiondict.values() if x.action == 'remove']
+    toadd = [(x.path, x.callback) for x in actiondict.values() if x.action == 'add']
+    toremove = [(x.name, x.callback) for x in actiondict.values() if x.action == 'remove']
     self._do_add(toadd)
     self._do_remove(toremove)
 
@@ -127,7 +136,7 @@ class EventHandler(pyinotify.ProcessEvent):
     self._db = dbm.gnu.open(dbname, 'cs')
 
     dirs = [os.path.join(base, x) for x in ('any', 'i686', 'x86_64')]
-
+    self.files = files = set()
     for d in dirs:
       files.update(os.path.join(d, f) for f in os.listdir(d))
       wm.add_watch(d, pyinotify.ALL_EVENTS)
@@ -137,10 +146,14 @@ class EventHandler(pyinotify.ProcessEvent):
 
   def _initial_update(self, files):
     oldfiles = {f.decode('utf-8') for f in self._db.keys()}
+
     for f in files - oldfiles:
-      self.dispatch(f, 'add')
+      if f.endswith('.pkg.tar.xz'):
+        self.dispatch(f, 'add')
+
     for f in oldfiles - files:
-      self.dispatch(f, 'remove')
+      if f.endswith('.pkg.tar.xz'):
+        self.dispatch(f, 'remove')
 
   def process_IN_CLOSE_WRITE(self, event):
     logging.debug('Writing done: %s', event.pathname)
@@ -216,13 +229,16 @@ class EventHandler(pyinotify.ProcessEvent):
   def _real_dispatch(self, d, act):
     key = act.path.encode('utf-8')
     if act.action == 'add':
-      self._db[key] = b'\x01'
+      def callback():
+        self._db[key] = b'\x01'
     else:
-      try:
-        del self._db[key]
-      except KeyError:
-        logging.warn('files db inconsistent: key %s not there', key)
+      def callback():
+        try:
+          del self._db[key]
+        except KeyError:
+          logging.warn('files db inconsistent: key %s not there', key)
 
+    act.callback = callback
     self.repomans[d].add_action(act)
 
   # def process_default(self, event):
