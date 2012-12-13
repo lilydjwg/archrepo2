@@ -7,6 +7,7 @@ import configparser
 from functools import partial
 import queue
 import logging
+import dbm.gnu
 
 import pyinotify
 from tornado.ioloop import IOLoop
@@ -15,6 +16,8 @@ import tornado.process
 import archpkg
 from myutils import enable_pretty_logging
 enable_pretty_logging(logging.DEBUG)
+
+# FIXME: 如果一个软件包消失了，那么如果它在仓库数据库里，它就应当从数据库删除。否则不应该
 
 class ActionInfo:
   def __init__(self, path, action):
@@ -116,17 +119,28 @@ class RepoMan:
 class EventHandler(pyinotify.ProcessEvent):
   def my_init(self, config, wm, ioloop=None):
     self.moved_away = {}
-    self.files = files = set()
     self.repomans = {}
     self._ioloop = ioloop or IOLoop.instance()
 
     base = config.get('path')
+    dbname = config.get('files-db', os.path.join(base, 'repofiles.db'))
+    self._db = dbm.gnu.open(dbname, 'cs')
+
     dirs = [os.path.join(base, x) for x in ('any', 'i686', 'x86_64')]
 
     for d in dirs:
       files.update(os.path.join(d, f) for f in os.listdir(d))
       wm.add_watch(d, pyinotify.ALL_EVENTS)
       self.repomans[d] = RepoMan(config, d, self._ioloop)
+
+    self._initial_update(files)
+
+  def _initial_update(self, files):
+    oldfiles = {f.decode('utf-8') for f in self._db.keys()}
+    for f in files - oldfiles:
+      self.dispatch(f, 'add')
+    for f in oldfiles - files:
+      self.dispatch(f, 'remove')
 
   def process_IN_CLOSE_WRITE(self, event):
     logging.debug('Writing done: %s', event.pathname)
@@ -188,7 +202,7 @@ class EventHandler(pyinotify.ProcessEvent):
         newpath = os.path.join(newd, file)
         if action == 'add':
           os.symlink(os.path.join('..', arch, file), newpath)
-          self.repomans[newd].add_action(ActionInfo(newpath, action))
+          self._real_dispatch(newd, ActionInfo(newpath, action))
         else:
           try:
             os.unlink(newpath)
@@ -196,6 +210,18 @@ class EventHandler(pyinotify.ProcessEvent):
           except FileNotFoundError:
             # someone deleted the file for us
             pass
+
+    self._real_dispatch(d, act)
+
+  def _real_dispatch(self, d, act):
+    key = act.path.encode('utf-8')
+    if act.action == 'add':
+      self._db[key] = b'\x01'
+    else:
+      try:
+        del self._db[key]
+      except KeyError:
+        logging.warn('files db inconsistent: key %s not there', key)
 
     self.repomans[d].add_action(act)
 
