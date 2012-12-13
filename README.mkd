@@ -1,0 +1,11 @@
+USAGE
+====
+Edit a copy of `archrepo.ini` and then run `./archreposrv <config>`.
+
+DEPENDENCIES
+====
+
+* Python, &gt;= 3.3
+* tornado, > 2.4.1
+* pyinotify, tested 0.9.4
+* winterpy
