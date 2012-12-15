@@ -144,6 +144,7 @@ class EventHandler(pyinotify.ProcessEvent):
                          pkgname text,
                          pkgarch text,
                          pkgver text,
+                         forarch text,
                          owner text,
                          mtime int,
                          state int)''')
@@ -244,8 +245,9 @@ class EventHandler(pyinotify.ProcessEvent):
 
   def _real_dispatch(self, d, act):
     if act.action == 'add':
+      arch = os.path.split(d)[1]
       def callback():
-        self._db.execute('update pkginfo set state = 0 where pkgname = ? and pkgarch = ?', (act.name, act.arch))
+        self._db.execute('update pkginfo set state = 0 where pkgname = ? and forarch = ?', (act.name, arch))
         stat = os.stat(act.path)
         mtime = int(stat.st_mtime)
         try:
@@ -255,9 +257,9 @@ class EventHandler(pyinotify.ProcessEvent):
 
         self._db.execute(
           '''insert or replace into pkginfo
-             (filename, pkgname, pkgarch, pkgver, state, owner, mtime) values
-             (?, ?, ?, ?, ?, ?, ?)''',
-          (act.path, act.name, act.arch, act.fullversion, 1, owner, mtime))
+             (filename, pkgname, pkgarch, pkgver, forarch, state, owner, mtime) values
+             (?,        ?,       ?,       ?,      ?,       ?,     ?,     ?)''',
+          (act.path, act.name, act.arch, act.fullversion, arch, 1, owner, mtime))
 
     else:
       res = self._db.execute('select state from pkginfo where filename = ? and state = 1 limit 1', (act.path,))
