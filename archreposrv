@@ -4,6 +4,7 @@
 import os
 import sys
 import re
+import pwd
 import configparser
 from functools import partial
 import queue
@@ -140,6 +141,9 @@ class EventHandler(pyinotify.ProcessEvent):
                         (filename text unique,
                          pkgname text,
                          pkgarch text,
+                         pkgver text,
+                         owner text,
+                         mtime int,
                          state int)''')
 
     dirs = [os.path.join(base, x) for x in ('any', 'i686', 'x86_64')]
@@ -237,9 +241,19 @@ class EventHandler(pyinotify.ProcessEvent):
     if act.action == 'add':
       self._db.execute('update pkginfo set state = 0 where pkgname = ? and pkgarch = ?', (act.name, act.arch))
       def callback():
+        stat = os.stat(act.path)
+        mtime = int(stat.st_mtime)
+        try:
+          owner = pwd.getpwuid(stat.st_uid).pw_name
+        except KeyError:
+          owner = 'uid_%d' % stat.st_uid
+
         self._db.execute(
-          'insert or replace into pkginfo (filename, pkgname, pkgarch, state) values (?, ?, ?, ?)',
-          (act.path, act.name, act.arch, 1))
+          '''insert or replace into pkginfo
+             (filename, pkgname, pkgarch, pkgver, state, owner, mtime) values
+             (?, ?, ?, ?, ?, ?, ?)''',
+          (act.path, act.name, act.arch, act.fullversion, 1, owner, mtime))
+
     else:
       res = self._db.execute('select state from pkginfo where filename = ? and state = 1 limit 1', (act.path,))
       if tuple(res) == ():
