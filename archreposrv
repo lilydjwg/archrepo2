@@ -12,6 +12,7 @@ import logging
 import sqlite3
 
 import pyinotify
+Event = pyinotify.Event
 from tornado.ioloop import IOLoop
 import tornado.process
 
@@ -158,12 +159,12 @@ class EventHandler(pyinotify.ProcessEvent):
   def _initial_update(self, files):
     oldfiles = {f[0] for f in self._db.execute('select filename from pkginfo')}
 
-    for f in files - oldfiles:
-      if f.endswith('.pkg.tar.xz'):
+    for f in sorted(files - oldfiles, key=pkgsortkey):
+      if not filterPkg(f):
         self.dispatch(f, 'add')
 
-    for f in oldfiles - files:
-      if f.endswith('.pkg.tar.xz'):
+    for f in sorted(oldfiles - files, key=pkgsortkey):
+      if not filterPkg(f):
         self.dispatch(f, 'remove')
 
   def process_IN_CLOSE_WRITE(self, event):
@@ -239,8 +240,8 @@ class EventHandler(pyinotify.ProcessEvent):
 
   def _real_dispatch(self, d, act):
     if act.action == 'add':
-      self._db.execute('update pkginfo set state = 0 where pkgname = ? and pkgarch = ?', (act.name, act.arch))
       def callback():
+        self._db.execute('update pkginfo set state = 0 where pkgname = ? and pkgarch = ?', (act.name, act.arch))
         stat = os.stat(act.path)
         mtime = int(stat.st_mtime)
         try:
@@ -268,8 +269,14 @@ class EventHandler(pyinotify.ProcessEvent):
   # def process_default(self, event):
   #   print(event)
 
-def filterPkg(event):
-  return not _pkgfile_pat.search(event.pathname)
+def filterPkg(path):
+  if isinstance(path, Event):
+    path = path.pathname
+  return not _pkgfile_pat.search(path)
+
+def pkgsortkey(path):
+  pkg = archpkg.PkgNameInfo.parseFilename(os.path.split(path)[1])
+  return (pkg.name, pkg.arch, pkg)
 
 def main(conffile):
   config = configparser.ConfigParser()
