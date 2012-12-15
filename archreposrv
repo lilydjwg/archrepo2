@@ -7,6 +7,7 @@ import re
 import pwd
 import configparser
 from functools import partial
+from itertools import filterfalse
 import queue
 import logging
 import sqlite3
@@ -159,13 +160,11 @@ class EventHandler(pyinotify.ProcessEvent):
   def _initial_update(self, files):
     oldfiles = {f[0] for f in self._db.execute('select filename from pkginfo')}
 
-    for f in sorted(files - oldfiles, key=pkgsortkey):
-      if not filterPkg(f):
-        self.dispatch(f, 'add')
+    for f in sorted(filterfalse(filterPkg, files - oldfiles), key=pkgsortkey):
+      self.dispatch(f, 'add')
 
-    for f in sorted(oldfiles - files, key=pkgsortkey):
-      if not filterPkg(f):
-        self.dispatch(f, 'remove')
+    for f in sorted(filterfalse(filterPkg, oldfiles - files), key=pkgsortkey):
+      self.dispatch(f, 'remove')
 
   def process_IN_CLOSE_WRITE(self, event):
     logging.debug('Writing done: %s', event.pathname)
