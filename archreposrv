@@ -3,6 +3,7 @@
 
 import os
 import sys
+import re
 import configparser
 from functools import partial
 import queue
@@ -16,6 +17,9 @@ import tornado.process
 import archpkg
 from myutils import enable_pretty_logging
 enable_pretty_logging(logging.DEBUG)
+
+# handles only x86_64, i686 and any arch packages
+_pkgfile_pat = re.compile(r'(?:^|/)[a-z0-9_-]+-[a-z0-9_.]+-\d+-(?:x86_64|i686|any)\.pkg\.tar\.xz$')
 
 class ActionInfo(archpkg.PkgNameInfo):
   def __new__(cls, path, action, four=None, five=None):
@@ -112,8 +116,8 @@ class RepoMan:
         actiondict[act.name] = act
       else:
         oldact = actiondict[act.name]
-        if oldact.pkginfo == act.pkginfo:
-          # same package, do nothing
+        if oldact == act and oldact.action != act.action:
+          # same package, opposite actions, do nothing
           del actiondict[act.name]
         else:
           # take the later action
@@ -242,7 +246,7 @@ class EventHandler(pyinotify.ProcessEvent):
         # the file isn't in repo database, ignoring
         return
       def callback():
-        self._db.execute('delete from pkginfo where pkgfile = ?', (act.path,))
+        self._db.execute('delete from pkginfo where filename = ?', (act.path,))
 
     act.callback = callback
     self.repomans[d].add_action(act)
@@ -251,7 +255,7 @@ class EventHandler(pyinotify.ProcessEvent):
   #   print(event)
 
 def filterPkg(event):
-  return not event.pathname.endswith('.pkg.tar.xz')
+  return not _pkgfile_pat.search(event.pathname)
 
 def main(conffile):
   config = configparser.ConfigParser()
