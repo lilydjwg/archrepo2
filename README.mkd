@@ -6,11 +6,13 @@ DEPENDENCIES
 ====
 
 * Python, &gt;= 3.3, with sqlite support
-* tornado, > 2.4.1
-* pyinotify, tested 0.9.4
-* winterpy
 * distribute
+* tornado, > 2.4.1
+* pyinotify, tested with 0.9.4
+* winterpy (add `pylib` to `$PYTHONPATH`
 
 TODO
 ====
+* [mediate] read package info
 * [low] support symlinking packages here
+* [low] verify packages
