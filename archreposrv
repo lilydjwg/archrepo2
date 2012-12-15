@@ -262,7 +262,9 @@ class EventHandler(pyinotify.ProcessEvent):
     else:
       res = self._db.execute('select state from pkginfo where filename = ? and state = 1 limit 1', (act.path,))
       if tuple(res) == ():
-        # the file isn't in repo database, ignoring
+        # the file isn't in repo database, just delete from our info database
+        logging.debug('deleting entry for not-in-database package: %s', act.path)
+        self._db.execute('delete from pkginfo where filename = ?', (act.path,))
         return
       def callback():
         self._db.execute('delete from pkginfo where filename = ?', (act.path,))
