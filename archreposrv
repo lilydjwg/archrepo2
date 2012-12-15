@@ -73,9 +73,10 @@ class RepoMan:
     p.set_exit_callback(partial(self.command_done, callbacks))
 
   def command_done(self, callbacks, status):
-    if status == 0 and callbacks:
-      for cb in callbacks:
-        cb()
+    if status == 0:
+      if callbacks:
+        for cb in callbacks:
+          cb()
       logging.info('previous command done.')
     else:
       logging.warn('previous command failed with status code %d.', status)
