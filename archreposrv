@@ -76,6 +76,9 @@ class RepoMan:
     if status == 0 and callbacks:
       for cb in callbacks:
         cb()
+      logging.info('previous command done.')
+    else:
+      logging.warn('previous command failed with status code %d.', status)
     self.run_command()
 
   def _do_cmd(self, cmd, items, callbacks):
