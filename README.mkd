@@ -10,3 +10,7 @@ DEPENDENCIES
 * pyinotify, tested 0.9.4
 * winterpy
 * distribute
+
+TODO
+====
+* [low] support symlinking packages here
