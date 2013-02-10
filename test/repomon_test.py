@@ -119,7 +119,7 @@ class Server:
     self.conffile = conffile
 
   def start(self):
-    server_path = os.path.normpath(os.path.join(__file__, '../../archreposrv'))
+    server_path = os.path.join('.', os.path.normpath(os.path.join(__file__, '../../archreposrv')))
     logging.debug('server path: %s', server_path)
     logging.info('starting server...')
     self.p = subprocess.Popen([server_path, self.conffile])
