@@ -1,0 +1,51 @@
+base_dir: /var/cache/pacman/pkg
+
+# i686 and x86_64 packages
+add: any zip-3.0-3-x86_64.pkg.tar.xz
+add: x86_64 zip-3.0-3-i686.pkg.tar.xz
+wait
+checky: x86_64/zip-3.0-3-x86_64.pkg.tar.xz
+checky: i686/zip-3.0-3-i686.pkg.tar.xz
+checkp: x86_64 zip=3.0-3
+checkp: i686 zip=3.0-3
+
+# 'any' package
+add: i686 ydcv-0.3-1-any.pkg.tar.xz
+wait
+checky: any/ydcv-0.3-1-any.pkg.tar.xz
+checky: i686/ydcv-0.3-1-any.pkg.tar.xz
+checky: x86_64/ydcv-0.3-1-any.pkg.tar.xz
+checkp: x86_64 ydcv=0.3-1
+checkp: i686 ydcv=0.3-1
+
+# update a package
+add: any ydcv-0.3.2-1-any.pkg.tar.xz
+wait
+checky: any/ydcv-0.3.2-1-any.pkg.tar.xz
+checky: i686/ydcv-0.3.2-1-any.pkg.tar.xz
+checky: x86_64/ydcv-0.3.2-1-any.pkg.tar.xz
+checkp: x86_64 ydcv=0.3.2-1
+checkp: i686 ydcv=0.3.2-1
+
+# downgrade and remove
+add: i686 ydcv-0.3.1-1-any.pkg.tar.xz
+remove: any ydcv-0.3-1-any.pkg.tar.xz
+wait
+checkn: any/ydcv-0.3-1-any.pkg.tar.xz
+checkn: i686/ydcv-0.3-1-any.pkg.tar.xz
+checkn: x86_64/ydcv-0.3-1-any.pkg.tar.xz
+checkp: x86_64 ydcv=0.3.1-1
+checkp: i686 ydcv=0.3.1-1
+
+# completely remove packages
+remove: any ydcv-0.3.1-1-any.pkg.tar.xz
+remove: i686 zip-3.0-3-i686.pkg.tar.xz
+wait
+checkn: any/ydcv-0.3.1-1-any.pkg.tar.xz
+checkn: i686/ydcv-0.3.1-1-any.pkg.tar.xz
+checkn: x86_64/ydcv-0.3.1-1-any.pkg.tar.xz
+checkp: x86_64 ydcv=null
+checkp: i686 ydcv=null
+checkp: any ydcv=null
+checkp: i686 zip=null
+checkp: x86_64 zip=3.0-3
