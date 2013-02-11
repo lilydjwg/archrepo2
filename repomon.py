@@ -21,6 +21,7 @@ import tornado.process
 
 import archpkg
 import pkgreader
+import dbutil
 
 logger = logging.getLogger(__name__)
 
@@ -190,7 +191,12 @@ class EventHandler(pyinotify.ProcessEvent):
 
     base = config.get('path')
     dbname = config.get('info-db', os.path.join(base, 'pkginfo.db'))
+    new_db = not os.path.exists(dbname)
     self._db = sqlite3.connect(dbname, isolation_level=None) # isolation_level=None means autocommit
+    if new_db:
+      dbutil.setver(self._db, '0.2')
+    else:
+      assert dbutil.getver(self._db) == '0.2', 'wrong database version, please upgrade (see scripts directory)'
     self._db.execute('''create table if not exists pkginfo
                         (filename text unique,
                          pkgname text,

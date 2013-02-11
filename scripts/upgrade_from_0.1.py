@@ -10,7 +10,7 @@ top_dir = os.path.normpath(os.path.join(__file__, '../..'))
 sys.path.append(top_dir)
 
 import pkgreader
-from common import *
+from dbutil import *
 
 def main(conffile):
   config = configparser.ConfigParser()
