@@ -13,6 +13,5 @@ DEPENDENCIES
 
 TODO
 ====
-* [mediate] read package info
 * [low] support symlinking packages here
 * [low] verify packages

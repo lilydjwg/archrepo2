@@ -12,6 +12,7 @@ import sqlite3
 import socket
 import time
 import hashlib
+import pickle
 
 import pyinotify
 Event = pyinotify.Event
@@ -19,6 +20,7 @@ from tornado.ioloop import IOLoop
 import tornado.process
 
 import archpkg
+import pkgreader
 
 logger = logging.getLogger(__name__)
 
@@ -197,7 +199,8 @@ class EventHandler(pyinotify.ProcessEvent):
                          forarch text,
                          owner text,
                          mtime int,
-                         state int)''')
+                         state int,
+                         info text)''')
 
     dirs = [os.path.join(base, x) for x in ('any', 'i686', 'x86_64')]
     self.files = files = set()
@@ -305,11 +308,18 @@ class EventHandler(pyinotify.ProcessEvent):
         except KeyError:
           owner = 'uid_%d' % stat.st_uid
 
+        try:
+          info = pkgreader.readpkg(act.path)
+        except:
+          logger.error('failed to read info for package %s', act.path)
+          info = None
+        info = pickle.dumps(info)
+
         self._db.execute(
           '''insert or replace into pkginfo
-             (filename, pkgname, pkgarch, pkgver, forarch, state, owner, mtime) values
-             (?,        ?,       ?,       ?,      ?,       ?,     ?,     ?)''',
-          (act.path, act.name, act.arch, act.fullversion, arch, 1, owner, mtime))
+             (filename, pkgname, pkgarch, pkgver, forarch, state, owner, mtime, info) values
+             (?,        ?,       ?,       ?,      ?,       ?,     ?,     ?,     ?)''',
+          (act.path, act.name, act.arch, act.fullversion, arch, 1, owner, mtime, info))
 
     else:
       res = self._db.execute('select state from pkginfo where filename = ? and state = 1 limit 1', (act.path,))
