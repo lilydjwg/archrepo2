@@ -206,7 +206,7 @@ class EventHandler(pyinotify.ProcessEvent):
                          owner text,
                          mtime int,
                          state int,
-                         info text)''')
+                         info blob)''')
 
     dirs = [os.path.join(base, x) for x in ('any', 'i686', 'x86_64')]
     self.files = files = set()
