@@ -5,6 +5,10 @@ import os, sys
 import sqlite3
 import configparser
 import pickle
+import logging
+
+from myutils import enable_pretty_logging
+enable_pretty_logging(logging.DEBUG)
 
 top_dir = os.path.normpath(os.path.join(__file__, '../..'))
 sys.path.append(top_dir)
@@ -32,7 +36,7 @@ def main(conffile):
     try:
       info = pkgreader.readpkg(p)
     except:
-      logger.error('failed to read info for package %s', act.path)
+      logging.error('failed to read info for package %s', act.path)
       info = None
     info = pickle.dumps(info)
     db.execute('update pkginfo set info=?', (info,))
