@@ -289,9 +289,7 @@ class EventHandler(pyinotify.ProcessEvent):
             os.symlink(os.path.join('..', arch, file), newpath)
           except FileExistsError:
             pass
-          else:
-            # XXX: this should be removed as soon as symlinks are supported
-            self._real_dispatch(newd, ActionInfo(newpath, action))
+          self._real_dispatch(newd, ActionInfo(newpath, action))
         else:
           try:
             os.unlink(newpath)
