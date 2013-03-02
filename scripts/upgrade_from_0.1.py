@@ -27,7 +27,7 @@ def main(conffile):
   assert getver(db) == '0.1', 'wrong database version'
   input('Please stop the service and then press Enter.')
   try:
-    db.execute('alter table pkginfo add info text')
+    db.execute('alter table pkginfo add info blob')
   except sqlite3.OperationalError:
     # the column is already there
     pass
