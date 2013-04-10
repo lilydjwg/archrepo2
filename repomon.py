@@ -315,7 +315,7 @@ class EventHandler(pyinotify.ProcessEvent):
         try:
           info = pkgreader.readpkg(act.path)
         except:
-          logger.error('failed to read info for package %s', act.path)
+          logger.error('failed to read info for package %s', act.path, exc_info=True)
           info = None
         info = pickle.dumps(info)
 
