@@ -4,7 +4,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 multikeys = {'depend', 'makepkgopt', 'optdepend', 'replaces', 'conflict',
-             'provides', 'license', 'backup', 'group'}
+             'provides', 'license', 'backup', 'group', 'makedepend'}
 
 def _add_to_dict(d, key, value):
   if key in multikeys:
