@@ -26,13 +26,13 @@ import dbutil
 logger = logging.getLogger(__name__)
 
 # handles only x86_64, i686 and any arch packages
-_pkgfile_pat = re.compile(r'(?:^|/)[a-z0-9_-]+-[a-z0-9_.]+-\d+-(?:x86_64|i686|any)\.pkg\.tar\.xz$')
+_pkgfile_pat = re.compile(r'(?:^|/)[a-z0-9_-]+-[a-z0-9_.]+-\d+-(?:x86_64|i686|any)\.pkg\.tar\.xz(?:\.sig)?$')
 
 class ActionInfo(archpkg.PkgNameInfo):
-  def __new__(cls, path, action, four=None, five=None):
+  def __new__(cls, path, action, four=None, five=None, pkgpath=None):
     if four is not None:
       return super().__new__(cls, path, action, four, five)
-    file = os.path.split(path)[1]
+    file = os.path.split(pkgpath or path)[1]
     self = cls.parseFilename(file)
     self.action = action
     self.path = path
@@ -207,6 +207,8 @@ class EventHandler(pyinotify.ProcessEvent):
                          mtime int,
                          state int,
                          info blob)''')
+    self._db.execute('''create table if not exists sigfiles
+                        (filename text unique)''')
 
     dirs = [os.path.join(base, x) for x in ('any', 'i686', 'x86_64')]
     self.files = files = set()
@@ -219,6 +221,7 @@ class EventHandler(pyinotify.ProcessEvent):
 
   def _initial_update(self, files):
     oldfiles = {f[0] for f in self._db.execute('select filename from pkginfo')}
+    oldfiles.update(f[0] for f in self._db.execute('select filename from sigfiles'))
 
     for f in sorted(filterfalse(filterPkg, files - oldfiles), key=pkgsortkey):
       self.dispatch(f, 'add')
@@ -263,14 +266,20 @@ class EventHandler(pyinotify.ProcessEvent):
       self.dispatch(event.pathname, 'add')
 
   def dispatch(self, path, action):
-    act = ActionInfo(path, action)
-    d, file = os.path.split(path)
+    if path.endswith('.sig'):
+      act = ActionInfo(path, action, pkgpath=path[:-4])
+      callback = self._record_signatures
+    else:
+      act = ActionInfo(path, action)
+      callback = self._real_dispatch
 
+    d, file = os.path.split(path)
     base, arch = os.path.split(d)
 
     # rename if a packager has added to a wrong directory
     # but not for a link that has arch=any, as that's what we created
-    if action == 'add' and act.arch != arch and not (os.path.islink(path) and act.arch == 'any'):
+    if action == 'add' and act.arch != arch and not \
+       (os.path.islink(path) and act.arch == 'any'):
       newd = os.path.join(base, act.arch)
       newpath = os.path.join(newd, file)
       os.rename(path, newpath)
@@ -289,7 +298,7 @@ class EventHandler(pyinotify.ProcessEvent):
             os.symlink(os.path.join('..', arch, file), newpath)
           except FileExistsError:
             pass
-          self._real_dispatch(newd, ActionInfo(newpath, action))
+          callback(newd, ActionInfo(newpath, action))
         else:
           try:
             os.unlink(newpath)
@@ -298,7 +307,7 @@ class EventHandler(pyinotify.ProcessEvent):
             # someone deleted the file for us
             pass
 
-    self._real_dispatch(d, act)
+    callback(d, act)
 
   def _real_dispatch(self, d, act):
     if act.action == 'add':
@@ -315,7 +324,7 @@ class EventHandler(pyinotify.ProcessEvent):
         try:
           info = pkgreader.readpkg(act.path)
         except:
-          logger.error('failed to read info for package %s', act.path)
+          logger.error('failed to read info for package %s', act.path, exc_info=True)
           info = None
         info = pickle.dumps(info)
 
@@ -338,8 +347,17 @@ class EventHandler(pyinotify.ProcessEvent):
     act.callback = callback
     self.repomans[d].add_action(act)
 
-  # def process_default(self, event):
-  #   print(event)
+  def _record_signatures(self, d, action):
+    path = action.path
+    action = action.action
+    logger.info('%s signature %s.', action, path)
+    if action == 'add':
+      self._db.execute('''insert or replace into sigfiles
+                          (filename) values (?)''',
+                       (path,))
+    else:
+      self._db.execute('''delete from sigfiles where filename = ?''',
+                       (path,))
 
 def filterPkg(path):
   if isinstance(path, Event):
