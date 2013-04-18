@@ -83,8 +83,11 @@ class RepoMan:
 
     logger.info('Running cmd: %r', cmd)
     # have to specify io_loop or we'll get error tracebacks
-    p = tornado.process.Subprocess(cmd, io_loop=self._ioloop)
-    p.set_exit_callback(partial(self.command_done, callbacks))
+    try:
+      p = tornado.process.Subprocess(cmd, io_loop=self._ioloop)
+      p.set_exit_callback(partial(self.command_done, callbacks))
+    except OSError:
+      logger.error('failed to run command.', exc_info=True)
 
   def command_done(self, callbacks, status):
     if status == 0:
