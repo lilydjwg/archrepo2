@@ -52,8 +52,9 @@ class RepoMan:
     self._base = base
 
     self._repo_dir = config.get('path')
-    self._db_name = os.path.join(base, config.get('name') + '.db.tar.gz')
-    self._files_name = os.path.join(base, self._db_name.replace('.db.tar.gz', '.files.tar.gz'))
+    self.name = config.get('name')
+    self._db_file = os.path.join(base, self.name + '.db.tar.gz')
+    self._files_name = os.path.join(base, self._db_file.replace('.db.tar.gz', '.files.tar.gz'))
     self._command_add = config.get('command-add', 'repo-add')
     self._command_remove = config.get('command-remove', 'repo-remove')
     self._wait_time = config.getint('wait-time', 10)
@@ -101,7 +102,7 @@ class RepoMan:
     self.run_command()
 
   def _do_cmd(self, cmd, items, callbacks):
-    cmd1 = [cmd, self._db_name]
+    cmd1 = [cmd, self._db_file]
     cmd1.extend(items)
     cmd2 = [cmd, '-f', self._files_name]
     cmd2.extend(items)
@@ -129,7 +130,7 @@ class RepoMan:
       cb()
 
   def add_action(self, action):
-    logger.info('Adding action %r to db %r', action, self._db_name)
+    logger.info('Adding action %r to db %r', action, self._db_file)
     self._action_pending(action)
 
   def _action_pending(self, act):
@@ -208,11 +209,12 @@ class EventHandler(pyinotify.ProcessEvent):
     new_db = not os.path.exists(dbname)
     self._db = sqlite3.connect(dbname, isolation_level=None) # isolation_level=None means autocommit
     if new_db:
-      dbutil.setver(self._db, '0.2')
+      dbutil.setver(self._db, '0.3')
     else:
-      assert dbutil.getver(self._db) == '0.2', 'wrong database version, please upgrade (see scripts directory)'
+      assert dbutil.getver(self._db) == '0.3', 'wrong database version, please upgrade (see scripts directory)'
     self._db.execute('''create table if not exists pkginfo
                         (filename text unique,
+                         pkgrepo text,
                          pkgname text,
                          pkgarch text,
                          pkgver text,
@@ -222,7 +224,8 @@ class EventHandler(pyinotify.ProcessEvent):
                          state int,
                          info blob)''')
     self._db.execute('''create table if not exists sigfiles
-                        (filename text unique)''')
+                        (filename text unique,
+                         pkgrepo text,)''')
 
     dirs = [os.path.join(base, x) for x in ('any', 'i686', 'x86_64')]
     self.files = files = set()
@@ -230,12 +233,13 @@ class EventHandler(pyinotify.ProcessEvent):
       files.update(os.path.join(d, f) for f in os.listdir(d))
       wm.add_watch(d, pyinotify.ALL_EVENTS)
       self.repomans[d] = RepoMan(config, d, self._ioloop)
+      self.name = self.repomans[d].name
 
     self._initial_update(files)
 
   def _initial_update(self, files):
-    oldfiles = {f[0] for f in self._db.execute('select filename from pkginfo')}
-    oldfiles.update(f[0] for f in self._db.execute('select filename from sigfiles'))
+    oldfiles = {f[0] for f in self._db.execute('select filename from pkginfo where pkgrepo = ?', (self.name,))}
+    oldfiles.update(f[0] for f in self._db.execute('select filename from sigfiles where pkgrepo = ?', (self.name,)))
 
     for f in sorted(filterfalse(filterPkg, files - oldfiles), key=pkgsortkey):
       self.dispatch(f, 'add')
@@ -327,7 +331,10 @@ class EventHandler(pyinotify.ProcessEvent):
     if act.action == 'add':
       arch = os.path.split(d)[1]
       def callback():
-        self._db.execute('update pkginfo set state = 0 where pkgname = ? and forarch = ?', (act.name, arch))
+        self._db.execute(
+          'update pkginfo set state = 0 where pkgname = ? and forarch = ? and pkgrepo = ?',
+          (act.name, arch, self.name)
+        )
         stat = os.stat(act.path)
         mtime = int(stat.st_mtime)
         try:
@@ -344,19 +351,22 @@ class EventHandler(pyinotify.ProcessEvent):
 
         self._db.execute(
           '''insert or replace into pkginfo
-             (filename, pkgname, pkgarch, pkgver, forarch, state, owner, mtime, info) values
-             (?,        ?,       ?,       ?,      ?,       ?,     ?,     ?,     ?)''',
-          (act.path, act.name, act.arch, act.fullversion, arch, 1, owner, mtime, info))
+             (filename, pkgrepo, pkgname, pkgarch, pkgver, forarch, state, owner, mtime, info) values
+             (?,        ?,       ?,       ?,       ?,      ?,       ?,     ?,     ?,     ?)''',
+          (act.path, self.name, act.name, act.arch, act.fullversion, arch, 1, owner, mtime, info))
 
     else:
-      res = self._db.execute('select state from pkginfo where filename = ? and state = 1 limit 1', (act.path,))
+      res = self._db.execute(
+        'select state from pkginfo where filename = ? and state = 1 and pkgrepo = ? limit 1',
+        (act.path, self.name)
+      )
       if tuple(res) == ():
         # the file isn't in repo database, just delete from our info database
         logger.debug('deleting entry for not-in-database package: %s', act.path)
-        self._db.execute('delete from pkginfo where filename = ?', (act.path,))
+        self._db.execute('delete from pkginfo where filename = ? and pkgrepo = ?', (act.path, self.name))
         return
       def callback():
-        self._db.execute('delete from pkginfo where filename = ?', (act.path,))
+        self._db.execute('delete from pkginfo where filename = ? and pkgrepo = ?', (act.path, self.name))
 
     act.callback = callback
     self.repomans[d].add_action(act)
@@ -367,11 +377,11 @@ class EventHandler(pyinotify.ProcessEvent):
     logger.info('%s signature %s.', action, path)
     if action == 'add':
       self._db.execute('''insert or replace into sigfiles
-                          (filename) values (?)''',
-                       (path,))
+                          (filename, pkgrepo) values (?, ?)''',
+                       (path, self.name))
     else:
-      self._db.execute('''delete from sigfiles where filename = ?''',
-                       (path,))
+      self._db.execute('''delete from sigfiles where filename = ? and pkgrepo = ?''',
+                       (path, self.name))
 
 def filterPkg(path):
   if isinstance(path, Event):

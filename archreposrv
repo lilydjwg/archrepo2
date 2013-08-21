@@ -17,6 +17,10 @@ def main(conffile):
   config.read(conffile)
 
   repos = config['multi'].get('repos', 'repository')
+  for field in ('name', 'path'):
+    if config['multi'].get(field, None) is not None:
+      raise ValueError('The config %r cannot have default value.' % field)
+
   repos = [repo.strip() for repo in repos.split(',')]
   notifiers = [repomon(config[repo]) for repo in repos]
 
