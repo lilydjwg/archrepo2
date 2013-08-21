@@ -57,6 +57,7 @@ class RepoMan:
     self._command_add = config.get('command-add', 'repo-add')
     self._command_remove = config.get('command-remove', 'repo-remove')
     self._wait_time = config.getint('wait-time', 10)
+    self._without_db = config.getboolean('without-db', False)
 
     notification_type = config.get('notification-type', 'null')
     if notification_type != 'null':
@@ -110,12 +111,22 @@ class RepoMan:
   def _do_add(self, toadd):
     if toadd:
       files, callbacks = zip(*toadd)
-      self._do_cmd(self._command_add, files, callbacks)
+      if self._without_db:
+        self._do_callbacks(callbacks)
+      else:
+        self._do_cmd(self._command_add, files, callbacks)
 
   def _do_remove(self, toremove):
     if toremove:
       files, callbacks = zip(*toremove)
-      self._do_cmd(self._command_remove, files, callbacks)
+      if self._without_db:
+        self._do_callbacks(callbacks)
+      else:
+        self._do_cmd(self._command_remove, files, callbacks)
+
+  def _do_callbacks(self, callbacks):
+    for cb in callbacks:
+      cb()
 
   def add_action(self, action):
     logger.info('Adding action %r to db %r', action, self._db_name)
