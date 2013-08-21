@@ -9,10 +9,11 @@ DEPENDENCIES
 * distribute
 * tornado, > 2.4.1
 * pyinotify, tested with 0.9.4
-* winterpy (add `pylib` to `$PYTHONPATH`
+* winterpy (add `pylib` to `$PYTHONPATH`)
 
 TODO
 ====
 * [high] adding and then removing it before adding complete will result in not-in-database removing
 * [low] support symlinking packages here
 * [low] verify packages
+* [middle] `setup.py` support
