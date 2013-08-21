@@ -14,6 +14,7 @@ DEPENDENCIES
 TODO
 ====
 * [high] adding and then removing it before adding complete will result in not-in-database removing
+* [high] remove winterpy dependency
+* [middle] `setup.py` support
 * [low] support symlinking packages here
 * [low] verify packages
-* [middle] `setup.py` support
