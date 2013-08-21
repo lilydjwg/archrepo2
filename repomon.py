@@ -225,7 +225,7 @@ class EventHandler(pyinotify.ProcessEvent):
                          info blob)''')
     self._db.execute('''create table if not exists sigfiles
                         (filename text unique,
-                         pkgrepo text,)''')
+                         pkgrepo text)''')
 
     dirs = [os.path.join(base, x) for x in ('any', 'i686', 'x86_64')]
     self.files = files = set()
