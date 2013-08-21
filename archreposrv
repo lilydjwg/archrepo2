@@ -13,17 +13,20 @@ enable_pretty_logging(logging.DEBUG)
 from repomon import repomon
 
 def main(conffile):
-  config = configparser.ConfigParser()
+  config = configparser.ConfigParser(default_section='multi')
   config.read(conffile)
 
-  notifier = repomon(config['repository'])
+  repos = config['multi'].get('repos', 'repository')
+  repos = [repo.strip() for repo in repos.split(',')]
+  notifiers = [repomon(config[repo]) for repo in repos]
 
   ioloop = IOLoop.instance()
   try:
     ioloop.start()
   except KeyboardInterrupt:
     ioloop.close()
-    notifier.stop()
+    for notifier in notifiers:
+      notifier.stop()
 
 if __name__ == '__main__':
   main(sys.argv[1])
