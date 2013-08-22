@@ -16,6 +16,7 @@ TODO
 * [high] adding and then removing it before adding complete will result in not-in-database removing
 * [high] remove winterpy dependency
 * [middle] `setup.py` support
+* [middle] disable "any" architecture via config
 * [low] use one common command queue (now one each repo)
 * [low] support symlinking packages here
 * [low] verify packages
