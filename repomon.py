@@ -202,6 +202,7 @@ class EventHandler(pyinotify.ProcessEvent):
   def my_init(self, config, wm, ioloop=None):
     self.moved_away = {}
     self.repomans = {}
+    self.our_links = set()
     self._ioloop = ioloop or IOLoop.instance()
 
     base = config.get('path')
@@ -261,6 +262,16 @@ class EventHandler(pyinotify.ProcessEvent):
       # symlinks haven't been added
       pass
 
+  def process_IN_CREATE(self, event):
+    file = event.pathname
+    if os.path.islink(file):
+      if file in self.our_links:
+        self.our_links.remove(file)
+      else:
+        logger.debug('Symlinked: %s', file)
+        self.dispatch(file, 'add')
+        self.files.add(file)
+
   def movedOut(self, event):
     logger.debug('Moved away: %s', event.pathname)
     self.dispatch(event.pathname, 'remove')
@@ -295,9 +306,7 @@ class EventHandler(pyinotify.ProcessEvent):
     base, arch = os.path.split(d)
 
     # rename if a packager has added to a wrong directory
-    # but not for a link that has arch=any, as that's what we created
-    if action == 'add' and act.arch != arch and not \
-       (os.path.islink(path) and act.arch == 'any'):
+    if action == 'add' and act.arch != arch:
       newd = os.path.join(base, act.arch)
       newpath = os.path.join(newd, file)
       os.rename(path, newpath)
@@ -313,6 +322,7 @@ class EventHandler(pyinotify.ProcessEvent):
         newpath = os.path.join(newd, file)
         if action == 'add':
           try:
+            self.our_links.add(newpath)
             os.symlink(os.path.join('..', arch, file), newpath)
           except FileExistsError:
             pass
