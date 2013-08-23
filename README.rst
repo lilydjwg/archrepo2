@@ -28,6 +28,7 @@ TODO
 -  [high] adding and then removing it before adding complete will result
    in not-in-database removing
 -  [middle] disable "any" architecture via config
+-  [middle] some attributes should be set on the EventHandler
 -  [low] fork to background
 -  [low] use one common command queue (now one each repo)
 -  [low] verify packages

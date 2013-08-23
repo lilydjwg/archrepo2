@@ -59,6 +59,8 @@ class RepoMan:
     self._command_remove = config.get('command-remove', 'repo-remove')
     self._wait_time = config.getint('wait-time', 10)
     self._without_db = config.getboolean('without-db', False)
+    self._auto_rename = config.getboolean('auto-rename', True)
+    self._symlink_any = config.getboolean('symlink-any', True)
 
     notification_type = config.get('notification-type', 'null')
     if notification_type != 'null':
@@ -235,6 +237,8 @@ class EventHandler(pyinotify.ProcessEvent):
       wm.add_watch(d, pyinotify.ALL_EVENTS)
       self.repomans[d] = RepoMan(config, d, self._ioloop)
       self.name = self.repomans[d].name
+      self._auto_rename = self.repomans[d]._auto_rename
+      self._symlink_any = self.repomans[d]._symlink_any
 
     self._initial_update(files)
 
@@ -306,7 +310,7 @@ class EventHandler(pyinotify.ProcessEvent):
     base, arch = os.path.split(d)
 
     # rename if a packager has added to a wrong directory
-    if action == 'add' and act.arch != arch:
+    if self._auto_rename and action == 'add' and act.arch != arch:
       newd = os.path.join(base, act.arch)
       newpath = os.path.join(newd, file)
       os.rename(path, newpath)
@@ -316,8 +320,11 @@ class EventHandler(pyinotify.ProcessEvent):
       arch = act.arch
       d = newd
 
-    if arch == 'any':
-      for newarch in ('i686', 'x86_64'):
+    if self._symlink_any and act.arch == 'any':
+      for newarch in ('i686', 'x86_64', 'any'):
+        if newarch == arch:
+          # this file itself
+          continue
         newd = os.path.join(base, newarch)
         newpath = os.path.join(newd, file)
         if action == 'add':

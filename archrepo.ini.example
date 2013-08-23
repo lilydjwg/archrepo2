@@ -27,9 +27,14 @@ path: /home/lilydjwg/tmpfs/test
 #command-remove: repo-remove
 
 # By enabling auto-rename, the server will automatically rename the package
-# files according to .PKGINFO, and move them under the correct architecture
+# files according to filenames, and move them under the correct architecture
 # directory. Default is on.
 #auto-rename: on
+
+# By enabling symlink-any, the server will automatically symlink the package
+# files of 'any' architecture to 'i686' and 'x86_64'
+# Default is on.
+#symlink-any: on
 
 # Seconds before actually running the command. 10s by default.
 #wait-time: 10
