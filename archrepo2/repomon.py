@@ -20,8 +20,8 @@ from tornado.ioloop import IOLoop
 import tornado.process
 
 import archpkg
-import pkgreader
-import dbutil
+from . import pkgreader
+from . import dbutil
 
 logger = logging.getLogger(__name__)
 

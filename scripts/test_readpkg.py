@@ -4,7 +4,7 @@
 from subprocess import getoutput
 allpkgs = getoutput(r"locate -be --regex '\.pkg\.tar\.xz$'").split('\n')
 
-from pkgreader import readpkg
+from archrepo2.pkgreader import readpkg
 for p in allpkgs:
   print('reading package:', p)
   d = readpkg(p)

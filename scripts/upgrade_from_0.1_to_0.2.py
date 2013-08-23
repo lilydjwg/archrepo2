@@ -10,11 +10,8 @@ import logging
 from myutils import enable_pretty_logging
 enable_pretty_logging(logging.DEBUG)
 
-top_dir = os.path.normpath(os.path.join(__file__, '../..'))
-sys.path.append(top_dir)
-
-import pkgreader
-from dbutil import *
+import archrepo2.pkgreader
+from archrepo2.dbutil import *
 
 def main(conffile):
   config = configparser.ConfigParser()

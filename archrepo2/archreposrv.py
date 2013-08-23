@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# vim:fileencoding=utf-8
 
 import sys
 import configparser
@@ -10,7 +9,9 @@ from tornado.ioloop import IOLoop
 from myutils import enable_pretty_logging
 enable_pretty_logging(logging.DEBUG)
 
-from repomon import repomon
+from .repomon import repomon
+
+logger = logging.getLogger(__name__)
 
 def check_and_get_repos(config):
   repos = config['multi'].get('repos', 'repository')
@@ -26,7 +27,8 @@ def check_and_get_repos(config):
 
   return repos
 
-def main(conffile):
+def main():
+  conffile = sys.argv[1]
   config = configparser.ConfigParser(default_section='multi')
   config.read(conffile)
   repos = check_and_get_repos(config)
@@ -34,12 +36,14 @@ def main(conffile):
   notifiers = [repomon(config[repo]) for repo in repos]
 
   ioloop = IOLoop.instance()
+  logger.info('starting archreposrv.')
   try:
     ioloop.start()
   except KeyboardInterrupt:
     ioloop.close()
     for notifier in notifiers:
       notifier.stop()
+    print()
 
 if __name__ == '__main__':
-  main(sys.argv[1])
+  main()

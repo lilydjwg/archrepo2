@@ -9,10 +9,7 @@ import logging
 from myutils import enable_pretty_logging
 enable_pretty_logging(logging.DEBUG)
 
-top_dir = os.path.normpath(os.path.join(__file__, '../..'))
-sys.path.append(top_dir)
-
-from dbutil import *
+from archrepo2.dbutil import *
 
 def main(dbname, reponame):
   db = sqlite3.connect(dbname, isolation_level=None)
