@@ -6,7 +6,7 @@ import sqlite3
 import pickle
 import logging
 
-from myutils import enable_pretty_logging
+from archrepo2.lib.nicelogger import enable_pretty_logging
 enable_pretty_logging(logging.DEBUG)
 
 from archrepo2.dbutil import *

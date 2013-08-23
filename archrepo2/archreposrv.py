@@ -6,7 +6,7 @@ import logging
 
 from tornado.ioloop import IOLoop
 
-from myutils import enable_pretty_logging
+from .lib.nicelogger import enable_pretty_logging
 enable_pretty_logging(logging.DEBUG)
 
 from .repomon import repomon

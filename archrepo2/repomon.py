@@ -19,7 +19,7 @@ Event = pyinotify.Event
 from tornado.ioloop import IOLoop
 import tornado.process
 
-import archpkg
+from .lib import archpkg
 from . import pkgreader
 from . import dbutil
 

@@ -15,7 +15,6 @@ DEPENDENCIES
 -  distribute
 -  tornado, > 2.4.1
 -  pyinotify, tested with 0.9.4
--  winterpy (add ``pylib`` to ``$PYTHONPATH``)
 
 NOTE
 ====
@@ -28,7 +27,6 @@ TODO
 
 -  [high] adding and then removing it before adding complete will result
    in not-in-database removing
--  [high] remove winterpy dependency
 -  [middle] disable "any" architecture via config
 -  [low] fork to background
 -  [low] use one common command queue (now one each repo)
