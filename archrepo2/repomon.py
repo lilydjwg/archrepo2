@@ -193,7 +193,8 @@ class RepoMan:
           # same package, opposite actions, do nothing
           del actiondict[act.name]
         else:
-          # take the later action
+          # take the later action, but record the former
+          actiondict[act.name].callback(state=0)
           actiondict[act.name] = act
     toadd = [(x.path, x.callback) for x in actiondict.values() if x.action == 'add']
     toremove = [(x.name, x.callback) for x in actiondict.values() if x.action == 'remove']
@@ -347,7 +348,7 @@ class EventHandler(pyinotify.ProcessEvent):
   def _real_dispatch(self, d, act):
     if act.action == 'add':
       arch = os.path.split(d)[1]
-      def callback():
+      def callback(state=1):
         self._db.execute(
           'update pkginfo set state = 0 where pkgname = ? and forarch = ? and pkgrepo = ?',
           (act.name, arch, self.name)
@@ -370,7 +371,7 @@ class EventHandler(pyinotify.ProcessEvent):
           '''insert or replace into pkginfo
              (filename, pkgrepo, pkgname, pkgarch, pkgver, forarch, state, owner, mtime, info) values
              (?,        ?,       ?,       ?,       ?,      ?,       ?,     ?,     ?,     ?)''',
-          (act.path, self.name, act.name, act.arch, act.fullversion, arch, 1, owner, mtime, info))
+          (act.path, self.name, act.name, act.arch, act.fullversion, arch, state, owner, mtime, info))
 
     else:
       res = self._db.execute(
