@@ -383,7 +383,8 @@ class EventHandler(pyinotify.ProcessEvent):
         logger.debug('deleting entry for not-in-database package: %s', act.path)
         self._db.execute('delete from pkginfo where filename = ? and pkgrepo = ?', (act.path, self.name))
         return
-      def callback():
+      def callback(state=any):
+        '''``state`` is not used'''
         self._db.execute('delete from pkginfo where filename = ? and pkgrepo = ?', (act.path, self.name))
 
     act.callback = callback
