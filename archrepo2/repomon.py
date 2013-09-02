@@ -26,7 +26,7 @@ from . import dbutil
 logger = logging.getLogger(__name__)
 
 # handles only x86_64, i686 and any arch packages
-_pkgfile_pat = re.compile(r'(?:^|/)[a-z0-9_-]+-[^-]+-\d+-(?:x86_64|i686|any)\.pkg\.tar\.xz(?:\.sig)?$')
+_pkgfile_pat = re.compile(r'(?:^|/)[a-z0-9_+-]+-[^-]+-\d+-(?:x86_64|i686|any)\.pkg\.tar\.xz(?:\.sig)?$')
 
 class ActionInfo(archpkg.PkgNameInfo):
   def __new__(cls, path, action, four=None, five=None, pkgpath=None):
