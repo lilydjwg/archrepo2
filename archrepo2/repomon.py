@@ -237,7 +237,10 @@ class EventHandler(pyinotify.ProcessEvent):
     dirs = [os.path.join(base, x) for x in ('any', 'i686', 'x86_64')]
     self.files = files = set()
     for d in dirs:
-      files.update(os.path.join(d, f) for f in os.listdir(d))
+      for f in os.listdir(d):
+        p = os.path.join(d, f)
+        if os.path.exists(p): # filter broken symlinks
+          files.add(p)
       wm.add_watch(d, pyinotify.ALL_EVENTS)
       self.repomans[d] = RepoMan(config, d, self._ioloop)
       self.name = self.repomans[d].name
