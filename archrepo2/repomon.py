@@ -375,6 +375,7 @@ class EventHandler(pyinotify.ProcessEvent):
              (filename, pkgrepo, pkgname, pkgarch, pkgver, forarch, state, owner, mtime, info) values
              (?,        ?,       ?,       ?,       ?,      ?,       ?,     ?,     ?,     ?)''',
           (act.path, self.name, act.name, act.arch, act.fullversion, arch, state, owner, mtime, info))
+        logger.info('Action %r done.', act)
 
     else:
       res = self._db.execute(
