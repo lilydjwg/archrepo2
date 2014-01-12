@@ -4,6 +4,7 @@
 import os
 import re
 import pwd
+import stat
 from functools import partial
 from itertools import filterfalse
 import queue
@@ -405,9 +406,15 @@ class EventHandler(pyinotify.ProcessEvent):
     # Touch the pacakge file so that we'll repo-add it again to include the
     # sig change later.
     pkg = path[:-4]
-    if os.path.exists(pkg):
-      logger.info('touching %s.', pkg)
-      os.close(os.open(pkg, os.O_WRONLY))
+    try:
+      st = os.lstat(pkg)
+      print(pkg, st)
+      if stat.S_ISREG(st.st_mode):
+        logger.info('touching %s.', pkg)
+        os.close(os.open(pkg, os.O_WRONLY))
+        os.utime(pkg)
+    except FileNotFoundError:
+      pass
 
     if action == 'add':
       self._db.execute('''insert or replace into sigfiles
