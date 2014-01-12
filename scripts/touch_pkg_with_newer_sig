@@ -1,0 +1,9 @@
+#!/bin/bash -e
+
+for f; do
+  p=${f%.sig}
+  if [[ -f $p && $f -nt $p ]]; then
+    echo "touching $p."
+    touch "$p"
+  fi
+done
