@@ -302,7 +302,7 @@ class EventHandler(pyinotify.ProcessEvent):
   def dispatch(self, path, action):
     if path.endswith('.sig'):
       act = ActionInfo(path, action, pkgpath=path[:-4])
-      callback = self._record_signatures
+      callback = self._signature_changed
     else:
       act = ActionInfo(path, action)
       callback = self._real_dispatch
@@ -390,10 +390,18 @@ class EventHandler(pyinotify.ProcessEvent):
     act.callback = callback
     self.repomans[d].add_action(act)
 
-  def _record_signatures(self, d, action):
+  def _signature_changed(self, d, action):
     path = action.path
     action = action.action
     logger.info('%s signature %s.', action, path)
+
+    # Touch the pacakge file so that we'll repo-add it again to include the
+    # sig change later.
+    pkg = path[:-4]
+    if os.path.exists(pkg):
+      logger.info('touching %s.', pkg)
+      os.close(os.open(pkg, os.O_WRONLY))
+
     if action == 'add':
       self._db.execute('''insert or replace into sigfiles
                           (filename, pkgrepo) values (?, ?)''',
