@@ -26,7 +26,7 @@ from . import dbutil
 logger = logging.getLogger(__name__)
 
 # handles only x86_64, i686 and any arch packages
-_pkgfile_pat = re.compile(r'(?:^|/)[a-z0-9_+-]+-[^-]+-\d+-(?:x86_64|i686|any)\.pkg\.tar\.xz(?:\.sig)?$')
+_pkgfile_pat = re.compile(r'(?:^|/).+-[^-]+-\d+-(?:x86_64|i686|any)\.pkg\.tar\.xz(?:\.sig)?$')
 
 class ActionInfo(archpkg.PkgNameInfo):
   def __new__(cls, path, action, four=None, five=None, pkgpath=None):
@@ -194,7 +194,10 @@ class RepoMan:
           del actiondict[act.name]
         else:
           # take the later action, but record the former
-          actiondict[act.name].callback(state=0)
+          try:
+              actiondict[act.name].callback(state=0)
+          except:
+              logger.exception('failed to run action %r.', actiondict[act.name])
           actiondict[act.name] = act
     toadd = [(x.path, x.callback) for x in actiondict.values() if x.action == 'add']
     toremove = [(x.name, x.callback) for x in actiondict.values() if x.action == 'remove']
@@ -234,7 +237,10 @@ class EventHandler(pyinotify.ProcessEvent):
     dirs = [os.path.join(base, x) for x in ('any', 'i686', 'x86_64')]
     self.files = files = set()
     for d in dirs:
-      files.update(os.path.join(d, f) for f in os.listdir(d))
+      for f in os.listdir(d):
+        p = os.path.join(d, f)
+        if os.path.exists(p): # filter broken symlinks
+          files.add(p)
       wm.add_watch(d, pyinotify.ALL_EVENTS)
       self.repomans[d] = RepoMan(config, d, self._ioloop)
       self.name = self.repomans[d].name
@@ -372,6 +378,7 @@ class EventHandler(pyinotify.ProcessEvent):
              (filename, pkgrepo, pkgname, pkgarch, pkgver, forarch, state, owner, mtime, info) values
              (?,        ?,       ?,       ?,       ?,      ?,       ?,     ?,     ?,     ?)''',
           (act.path, self.name, act.name, act.arch, act.fullversion, arch, state, owner, mtime, info))
+        logger.info('Action %r done.', act)
 
     else:
       res = self._db.execute(
