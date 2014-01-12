@@ -408,7 +408,6 @@ class EventHandler(pyinotify.ProcessEvent):
     pkg = path[:-4]
     try:
       st = os.lstat(pkg)
-      print(pkg, st)
       if stat.S_ISREG(st.st_mode):
         logger.info('touching %s.', pkg)
         os.close(os.open(pkg, os.O_WRONLY))
