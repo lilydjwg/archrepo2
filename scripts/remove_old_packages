@@ -47,7 +47,7 @@ def main(args):
         remove_pkg(f)
 
     if args.show_kept_fd >= 0:
-      for _, f in v[args.keep:]:
+      for _, f in v[-args.keep:]:
         os.write(args.show_kept_fd, f.encode('utf-8') + b'\n')
 
 if __name__ == '__main__':
