@@ -28,6 +28,12 @@ logger = logging.getLogger(__name__)
 # handles only x86_64, i686 and any arch packages
 _pkgfile_pat = re.compile(r'(?:^|/).+-[^-]+-\d+-(?:x86_64|i686|any)\.pkg\.tar\.xz(?:\.sig)?$')
 
+def same_existent_file(a, b):
+  try:
+    return os.path.samefile(path, newpath)
+  except OSError:
+    return False
+
 class ActionInfo(archpkg.PkgNameInfo):
   def __new__(cls, path, action, four=None, five=None, pkgpath=None):
     if four is not None:
@@ -208,6 +214,7 @@ class EventHandler(pyinotify.ProcessEvent):
   def my_init(self, config, wm, ioloop=None):
     self.moved_away = {}
     self.repomans = {}
+    # TODO: use a expiring dict
     self.our_links = set()
     self._ioloop = ioloop or IOLoop.instance()
 
@@ -320,12 +327,13 @@ class EventHandler(pyinotify.ProcessEvent):
     if self._auto_rename and action == 'add' and act.arch != arch:
       newd = os.path.join(base, act.arch)
       newpath = os.path.join(newd, file)
-      os.rename(path, newpath)
+      if not same_existent_file(path, newpath):
+        os.rename(path, newpath)
 
-      act.path = newpath
-      path = newpath
-      arch = act.arch
-      d = newd
+        act.path = newpath
+        path = newpath
+        arch = act.arch
+        d = newd
 
     if self._symlink_any and act.arch == 'any':
       for newarch in ('i686', 'x86_64', 'any'):
@@ -335,12 +343,14 @@ class EventHandler(pyinotify.ProcessEvent):
         newd = os.path.join(base, newarch)
         newpath = os.path.join(newd, file)
         if action == 'add':
-          try:
-            self.our_links.add(newpath)
-            os.symlink(os.path.join('..', arch, file), newpath)
-          except FileExistsError:
-            pass
-          callback(newd, ActionInfo(newpath, action))
+          oldpath = os.path.join('..', arch, file)
+          if not same_existent_file(oldpath, newpath):
+            try:
+              self.our_links.add(newpath)
+              os.symlink(oldpath, newpath)
+            except FileExistsError:
+              pass
+            callback(newd, ActionInfo(newpath, action))
         else:
           try:
             os.unlink(newpath)
