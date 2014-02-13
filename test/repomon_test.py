@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# vim:fileencoding=utf-8
 
 import os
 import sys
@@ -24,6 +23,13 @@ class WaitCommand(Command):
   def run(self):
     t = self.ctx['wait_time'] + 2
     logging.info('waiting for %d seconds...', t)
+    time.sleep(t)
+
+class RacingWaitCommand(Command):
+  cmd = 'racing-wait'
+  def run(self):
+    t = self.ctx['wait_time'] + 0.3
+    logging.info('Racing-waiting for %s seconds...', t)
     time.sleep(t)
 
 class BaseDirCommand(Command):
@@ -110,6 +116,9 @@ def run_action_file(conf, actlines):
     cmd = cmd.rstrip(':')
     try:
       cmdmap[cmd](ctx, args)
+    except KeyboardInterrupt:
+      logging.info('Interrupted.')
+      break
     except:
       logging.error('error running action: %s', l, exc_info=True)
   logging.info('done running action file.')
@@ -119,10 +128,8 @@ class Server:
     self.conffile = conffile
 
   def start(self):
-    server_path = os.path.join('.', os.path.normpath(os.path.join(__file__, '../../archreposrv')))
-    logging.debug('server path: %s', server_path)
     logging.info('starting server...')
-    self.p = subprocess.Popen([server_path, self.conffile])
+    self.p = subprocess.Popen(['archreposrv', self.conffile])
 
   def stop(self):
     logging.info('quitting server...')
