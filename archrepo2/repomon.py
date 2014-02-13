@@ -354,12 +354,11 @@ class EventHandler(pyinotify.ProcessEvent):
   def _real_dispatch(self, d, act):
     if act.action == 'add':
       arch = os.path.split(d)[1]
-      def callback(state=1):
+      def callback(stat, state=1):
         self._db.execute(
           'update pkginfo set state = 0 where pkgname = ? and forarch = ? and pkgrepo = ?',
           (act.name, arch, self.name)
         )
-        stat = os.stat(act.path)
         mtime = int(stat.st_mtime)
         try:
           owner = pwd.getpwuid(stat.st_uid).pw_name
@@ -380,6 +379,8 @@ class EventHandler(pyinotify.ProcessEvent):
           (act.path, self.name, act.name, act.arch, act.fullversion, arch, state, owner, mtime, info))
         logger.info('Action %r done.', act)
 
+      # stat path here, so that it is more unlikely to have disappeared since
+      callback = partial(callback, os.stat(act.path))
     else:
       res = self._db.execute(
         'select state from pkginfo where filename = ? and state = 1 and pkgrepo = ? limit 1',
