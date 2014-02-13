@@ -46,4 +46,6 @@ def main():
     print()
 
 if __name__ == '__main__':
+  if sys.version_info[:2] < (3, 3):
+    raise OSError('Python 3.3+ required.')
   main()
