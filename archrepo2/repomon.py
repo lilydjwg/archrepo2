@@ -30,7 +30,7 @@ _pkgfile_pat = re.compile(r'(?:^|/).+-[^-]+-\d+-(?:x86_64|i686|any)\.pkg\.tar\.x
 
 def same_existent_file(a, b):
   try:
-    return os.path.samefile(path, newpath)
+    return os.path.samefile(a, b)
   except OSError:
     return False
 
