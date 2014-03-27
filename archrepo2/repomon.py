@@ -198,16 +198,14 @@ class RepoMan:
         actiondict[act.name] = act
       else:
         oldact = actiondict[act.name]
-        if oldact == act and oldact.action != act.action:
-          # same package, opposite actions, do nothing
-          del actiondict[act.name]
-        else:
-          # take the later action, but record the former
+        if oldact != act:
+          # different packages, do the latter, but record the former
           try:
               actiondict[act.name].callback(state=0)
           except:
               logger.exception('failed to run action %r.', actiondict[act.name])
-          actiondict[act.name] = act
+        # same package, do the latter, and discard the forter
+        actiondict[act.name] = act
     toadd = [(x.path, x.callback) for x in actiondict.values() if x.action == 'add']
     toremove = [(x.name, x.callback) for x in actiondict.values() if x.action == 'remove']
     self._do_add(toadd)
