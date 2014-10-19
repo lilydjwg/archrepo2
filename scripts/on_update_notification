@@ -1,0 +1,84 @@
+#!/usr/bin/env python3
+
+import argparse
+import hashlib
+import logging
+import os
+import select
+import socket
+import subprocess
+import sys
+import time
+
+from nicelogger import enable_pretty_logging
+
+def run_command(command):
+  logging.info('running command %r', command)
+  try:
+    subprocess.check_call(command, shell=True)
+  except:
+    logging.exception('failed to run command %r', command)
+
+def decode_msg(msg, secret):
+  act, t, sig = msg.split('|')
+  hashing = act + '|' + t + secret
+  mysig = hashlib.sha1(hashing.encode('utf-8')).hexdigest()
+  if mysig != sig:
+    raise ValueError('signature mismatch')
+  return act, int(t)
+
+def main(args, secret):
+  af, socktype, proto, canonname, sockaddr = socket.getaddrinfo(
+    args.host, args.port, 0, socket.SOCK_DGRAM, 0, 0)[0]
+  sock = socket.socket(af, socktype, proto)
+  sock.bind((args.host, args.port))
+  while True:
+    r, w, e = select.select([sock], [], [], args.timeout)
+    if r:
+      msg, remote = sock.recvfrom(4096)
+      try:
+        msg = msg.decode('utf-8')
+        act, t = decode_msg(msg, secret)
+        if act == 'update' and abs(t - time.time()) < args.threshold:
+          run_command(args.command)
+        else:
+          logging.warn('skipping unknown or expired msg %r from %r...',
+                       msg, remote)
+      except:
+        logging.exception('error occurred, skipping msg %r from %r...',
+                          msg, remote)
+        continue
+    else:
+      run_command(args.command)
+
+if __name__ == '__main__':
+  enable_pretty_logging('INFO')
+  parser = argparse.ArgumentParser(
+    description='run command on archrepo2 update notification',
+    add_help=False,
+  )
+  parser.add_argument('-n', '--dry-run', action='store_true',
+                      help='dry run')
+  parser.add_argument('-h', '--host', default='0.0.0.0',
+                      help='host to bind to. default: IPv4 wild address')
+  parser.add_argument('-p', '--port', type=int, required=True,
+                      help='port to wait on')
+  parser.add_argument('-t', '--timeout', type=float,
+                      help='timeout for waiting. will run command')
+  parser.add_argument('-r', '--threshold', type=int, default=60,
+                      help='time threshold for message timestamp. default: 60')
+  parser.add_argument('--help', action='help',
+                      help='show this help message and exit')
+  parser.add_argument('command',
+                      help='command to run')
+  args = parser.parse_args()
+
+  secret = os.environ.get('REPO_SECRET', '')
+  if not secret:
+    logging.fatal('REPO_SECRET environment variable not set')
+    sys.exit(1)
+
+  try:
+    main(args, secret)
+  except KeyboardInterrupt:
+    print()
