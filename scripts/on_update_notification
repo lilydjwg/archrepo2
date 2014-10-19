@@ -28,6 +28,8 @@ def decode_msg(msg, secret):
   return act, int(t)
 
 def main(args, secret):
+  logging.info('started')
+
   af, socktype, proto, canonname, sockaddr = socket.getaddrinfo(
     args.host, args.port, 0, socket.SOCK_DGRAM, 0, 0)[0]
   sock = socket.socket(af, socktype, proto)
