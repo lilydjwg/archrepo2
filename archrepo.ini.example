@@ -42,7 +42,7 @@ wait-time: 3
 
 # Notification type to use when done. Currently available: simple-udp, null
 notification-type: simple-udp
-notification-address: 127.0.0.1:9900
+notification-addresses: 127.0.0.1:9900 ::1:9900
 notification-secret: JiUHuGY987G76djItfOskOj
 
 # If for any reason, you don't want actual database creation or update:

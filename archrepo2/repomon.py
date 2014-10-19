@@ -70,7 +70,7 @@ class RepoMan:
 
     notification_type = config.get('notification-type', 'null')
     if notification_type != 'null':
-      self._notification_addr = config.get('notification-address')
+      self._notification_addrs = config.get('notification-addresses')
       self._notification_secret = config.get('notification-secret')
     self.send_notification = getattr(
       self,
@@ -154,19 +154,26 @@ class RepoMan:
     )
 
   def send_notification_simple_udp(self):
-    address, port = self._parse_notification_address_inet()
-    try:
-      af, socktype, proto, canonname, sockaddr = socket.getaddrinfo(
-        address, port, 0, socket.SOCK_DGRAM, 0, 0)[0]
-    except:
-      logger.error('failed to create socket for notification', exc_info=True)
-      return
-
-    sock = socket.socket(af, socktype, proto)
     msg = self._new_notification_msg()
-    sock.sendto(msg, sockaddr)
-    sock.close()
-    logger.info('simple udp notification sent.')
+
+    socks = {}
+    for address, port in self._parse_notification_address_inet():
+      try:
+        af, socktype, proto, canonname, sockaddr = socket.getaddrinfo(
+          address, port, 0, socket.SOCK_DGRAM, 0, 0)[0]
+      except:
+        logger.exception('failed to create socket to %r for notification',
+                         (address, port))
+        continue
+
+      info = af, socktype, proto
+      if info not in socks:
+        sock = socket.socket(*info)
+        socks[info] = sock
+      else:
+        sock = socks[info]
+      sock.sendto(msg, sockaddr)
+      logger.info('simple udp notification sent to %s.', (address, port))
 
   def _new_notification_msg(self):
     s = 'update'
@@ -178,11 +185,14 @@ class RepoMan:
     return msg.encode('utf-8')
 
   def _parse_notification_address_inet(self):
-    cached = self._notification_addr
+    cached = self._notification_addrs
     if isinstance(cached, str):
-      host, port = cached.rsplit(':', 1)
-      port = int(port)
-      cached = self._notification_addr = (host, port)
+      addresses = []
+      for addr in cached.split():
+        host, port = addr.rsplit(':', 1)
+        port = int(port)
+        addresses.append((host, port))
+      cached = self._notification_addrs = tuple(addresses)
     return cached
 
   def send_notification_null(self):
