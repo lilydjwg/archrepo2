@@ -178,9 +178,10 @@ class RepoMan:
   def _new_notification_msg(self):
     s = 'update'
     t = str(int(time.time()))
-    part1 = s + '|' + t
-    part2 = hashlib.sha1(part1.encode('utf-8')).hexdigest()
-    msg = part1 + '|' + part2
+    data = s + '|' + t
+    hashing = data + self._notification_secret
+    sig = hashlib.sha1(hashing.encode('utf-8')).hexdigest()
+    msg = data + '|' + sig
     logger.info('new notification msg: %s.', msg)
     return msg.encode('utf-8')
 
