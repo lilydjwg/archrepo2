@@ -59,8 +59,6 @@ if __name__ == '__main__':
     description='run command on archrepo2 update notification',
     add_help=False,
   )
-  parser.add_argument('-n', '--dry-run', action='store_true',
-                      help='dry run')
   parser.add_argument('-h', '--host', default='0.0.0.0',
                       help='host to bind to. default: IPv4 wild address')
   parser.add_argument('-p', '--port', type=int, required=True,
