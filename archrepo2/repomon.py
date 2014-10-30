@@ -13,6 +13,7 @@ import socket
 import time
 import hashlib
 import pickle
+from os.path import relpath
 
 import pyinotify
 Event = pyinotify.Event
@@ -234,10 +235,11 @@ class EventHandler(pyinotify.ProcessEvent):
     dbname = config.get('info-db', os.path.join(base, 'pkginfo.db'))
     new_db = not os.path.exists(dbname)
     self._db = sqlite3.connect(dbname, isolation_level=None) # isolation_level=None means autocommit
+    self._db_dir = os.path.dirname(dbname)
     if new_db:
-      dbutil.setver(self._db, '0.3')
+      dbutil.setver(self._db, '0.4')
     else:
-      assert dbutil.getver(self._db) == '0.3', 'wrong database version, please upgrade (see scripts directory)'
+      assert dbutil.getver(self._db) == '0.4', 'wrong database version, please upgrade (see scripts directory)'
     self._db.execute('''create table if not exists pkginfo
                         (filename text unique,
                          pkgrepo text,
@@ -259,7 +261,7 @@ class EventHandler(pyinotify.ProcessEvent):
       for f in os.listdir(d):
         p = os.path.join(d, f)
         if os.path.exists(p): # filter broken symlinks
-          files.add(p)
+          files.add(relpath(p, start=self._db_dir))
       wm.add_watch(d, pyinotify.ALL_EVENTS)
       self.repomans[d] = RepoMan(config, d, self._ioloop)
       self.name = self.repomans[d].name
@@ -398,24 +400,26 @@ class EventHandler(pyinotify.ProcessEvent):
           '''insert or replace into pkginfo
              (filename, pkgrepo, pkgname, pkgarch, pkgver, forarch, state, owner, mtime, info) values
              (?,        ?,       ?,       ?,       ?,      ?,       ?,     ?,     ?,     ?)''',
-          (act.path, self.name, act.name, act.arch, act.fullversion, arch, state, owner, mtime, info))
+          (relpath(act.path, start=self._db_dir),
+                       self.name, act.name, act.arch, act.fullversion, arch, state, owner, mtime, info))
         logger.info('Action %r done.', act)
 
       # stat path here, so that it is more unlikely to have disappeared since
       callback = partial(callback, os.stat(act.path))
     else:
+      rpath = relpath(act.path, start=self._db_dir)
       res = self._db.execute(
         'select state from pkginfo where filename = ? and state = 1 and pkgrepo = ? limit 1',
-        (act.path, self.name)
+        (rpath, self.name)
       )
       if tuple(res) == ():
         # the file isn't in repo database, just delete from our info database
-        logger.debug('deleting entry for not-in-database package: %s', act.path)
-        self._db.execute('delete from pkginfo where filename = ? and pkgrepo = ?', (act.path, self.name))
+        logger.debug('deleting entry for not-in-database package: %s', rpath)
+        self._db.execute('delete from pkginfo where filename = ? and pkgrepo = ?', (rpath, self.name))
         return
       def callback(state=any):
         '''``state`` is not used'''
-        self._db.execute('delete from pkginfo where filename = ? and pkgrepo = ?', (act.path, self.name))
+        self._db.execute('delete from pkginfo where filename = ? and pkgrepo = ?', (rpath, self.name))
 
     act.callback = callback
     self.repomans[d].add_action(act)
@@ -437,13 +441,14 @@ class EventHandler(pyinotify.ProcessEvent):
     except FileNotFoundError:
       pass
 
+    rpath = relpath(path, start=self._db_dir)
     if action == 'add':
       self._db.execute('''insert or replace into sigfiles
                           (filename, pkgrepo) values (?, ?)''',
-                       (path, self.name))
+                       (rpath, self.name))
     else:
       self._db.execute('''delete from sigfiles where filename = ? and pkgrepo = ?''',
-                       (path, self.name))
+                       (rpath, self.name))
 
 def filterPkg(path):
   if isinstance(path, Event):
