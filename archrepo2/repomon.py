@@ -261,7 +261,7 @@ class EventHandler(pyinotify.ProcessEvent):
       for f in os.listdir(d):
         p = os.path.join(d, f)
         if os.path.exists(p): # filter broken symlinks
-          files.add(relpath(p, start=self._db_dir))
+          files.add(p)
       wm.add_watch(d, pyinotify.ALL_EVENTS)
       self.repomans[d] = RepoMan(config, d, self._ioloop)
       self.name = self.repomans[d].name
@@ -273,6 +273,7 @@ class EventHandler(pyinotify.ProcessEvent):
   def _initial_update(self, files):
     oldfiles = {f[0] for f in self._db.execute('select filename from pkginfo where pkgrepo = ?', (self.name,))}
     oldfiles.update(f[0] for f in self._db.execute('select filename from sigfiles where pkgrepo = ?', (self.name,)))
+    oldfiles = {os.path.join(self._db_dir, f) for f in oldfiles}
 
     for f in sorted(filterfalse(filterPkg, files - oldfiles), key=pkgsortkey):
       self.dispatch(f, 'add')
