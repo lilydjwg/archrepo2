@@ -27,7 +27,7 @@ from . import dbutil
 logger = logging.getLogger(__name__)
 
 # handles only x86_64, i686 and any arch packages
-_pkgfile_pat = re.compile(r'(?:^|/).+-[^-]+-\d+-(?:x86_64|i686|any)\.pkg\.tar\.xz(?:\.sig)?$')
+_pkgfile_pat = re.compile(r'(?:^|/).+-[^-]+-[\d.]+-(?:x86_64|i686|any)\.pkg\.tar\.xz(?:\.sig)?$')
 
 def same_existent_file(a, b):
   try:
