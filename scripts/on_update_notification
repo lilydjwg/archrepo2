@@ -32,6 +32,7 @@ def main(args, secret):
     args.host, args.port, 0, socket.SOCK_DGRAM, 0, 0)[0]
   sock = socket.socket(af, socktype, proto)
   sock.bind((args.host, args.port))
+  last_run = 0
   while True:
     r, w, e = select.select([sock], [], [], args.timeout)
     if r:
@@ -39,15 +40,21 @@ def main(args, secret):
       try:
         msg = msg.decode('utf-8')
         act, t = decode_msg(msg, secret)
-        if act == 'update' and abs(t - time.time()) < args.threshold:
-          run_command(args.command)
-        else:
+        now = time.time()
+        if not (act == 'update' and abs(t - now) < args.threshold):
           logging.warn('skipping unknown or expired msg %r from %r...',
                        msg, remote)
+          continue
+        if abs(now - last_run) < args.repeat_window:
+          logging.warn('refuse to run too frequently. last run: %r. msg %r from %r...',
+                        time.ctime(last_run), msg, remote)
+          continue
+
+        last_run = now
+        run_command(args.command)
       except:
         logging.exception('error occurred, skipping msg %r from %r...',
                           msg, remote)
-        continue
     else:
       run_command(args.command)
 
@@ -65,6 +72,8 @@ if __name__ == '__main__':
                       help='timeout for waiting. will run command')
   parser.add_argument('-r', '--threshold', type=int, default=60,
                       help='time threshold for message timestamp. default: 60')
+  parser.add_argument('-w', '--repeat-window', metavar='SECS', type=int, default=60,
+                      help="don't repeat within this amount of seconds. default: 60")
   parser.add_argument('--help', action='help',
                       help='show this help message and exit')
   parser.add_argument('command',
