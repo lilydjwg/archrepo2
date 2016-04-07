@@ -116,10 +116,7 @@ class RepoMan:
   def _do_cmd(self, cmd, items, callbacks):
     cmd1 = [cmd, self._db_file]
     cmd1.extend(items)
-    cmd2 = [cmd, '-f', self._files_name]
-    cmd2.extend(items)
-    self.queue_command(cmd1)
-    self.queue_command(cmd2, callbacks)
+    self.queue_command(cmd1, callbacks)
 
   def _do_add(self, toadd):
     if toadd:
