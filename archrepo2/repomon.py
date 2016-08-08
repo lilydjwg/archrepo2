@@ -26,8 +26,11 @@ from . import dbutil
 
 logger = logging.getLogger(__name__)
 
-# handles only x86_64, i686 and any arch packages
-_pkgfile_pat = re.compile(r'(?:^|/).+-[^-]+-[\d.]+-(?:x86_64|i686|any)\.pkg\.tar\.xz(?:\.sig)?$')
+# handles only arm*, aarch64, x86_64, i686 and any arch packages
+_supported_archs = ('arm', 'armv6h', 'armv7h', 'aarch64',
+                    'i686', 'x86_64', 'any')
+# assume none of the archs has regex meta characters
+_pkgfile_pat = re.compile(r'(?:^|/).+-[^-]+-[\d.]+-(?:' + '|'.join(_supported_archs) + r')\.pkg\.tar\.xz(?:\.sig)?$')
 
 def same_existent_file(a, b):
   try:
@@ -252,9 +255,10 @@ class EventHandler(pyinotify.ProcessEvent):
                         (filename text unique,
                          pkgrepo text)''')
 
-    dirs = [os.path.join(base, x) for x in ('any', 'i686', 'x86_64')]
+    dirs = [os.path.join(base, x) for x in _supported_archs]
     self.files = files = set()
     for d in dirs:
+      os.makedirs(d, exist_ok=True)
       for f in os.listdir(d):
         p = os.path.join(d, f)
         if os.path.exists(p): # filter broken symlinks
@@ -348,7 +352,7 @@ class EventHandler(pyinotify.ProcessEvent):
         d = newd
 
     if self._symlink_any and act.arch == 'any':
-      for newarch in ('i686', 'x86_64', 'any'):
+      for newarch in _supported_archs:
         if newarch == arch:
           # this file itself
           continue
@@ -357,6 +361,7 @@ class EventHandler(pyinotify.ProcessEvent):
         if action == 'add':
           oldpath = os.path.join('..', arch, file)
           if not same_existent_file(oldpath, newpath):
+            os.makedirs(newd, exist_ok=True)
             try:
               self.our_links.add(newpath)
               os.symlink(oldpath, newpath)

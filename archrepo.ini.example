@@ -32,7 +32,8 @@ path: /home/lilydjwg/tmpfs/test
 #auto-rename: on
 
 # By enabling symlink-any, the server will automatically symlink the package
-# files of 'any' architecture to 'i686' and 'x86_64'
+# files of 'any' architecture to 'arm', 'armv6h', 'armv7h', 'aarch64',
+# 'i686' and 'x86_64'
 # Default is on.
 #symlink-any: on
 
