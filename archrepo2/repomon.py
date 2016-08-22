@@ -26,12 +26,6 @@ from . import dbutil
 
 logger = logging.getLogger(__name__)
 
-# handles only arm*, aarch64, x86_64, i686 and any arch packages
-_supported_archs = ('arm', 'armv6h', 'armv7h', 'aarch64',
-                    'i686', 'x86_64', 'any')
-# assume none of the archs has regex meta characters
-_pkgfile_pat = re.compile(r'(?:^|/).+-[^-]+-[\d.]+-(?:' + '|'.join(_supported_archs) + r')\.pkg\.tar\.xz(?:\.sig)?$')
-
 def same_existent_file(a, b):
   try:
     return os.path.samefile(a, b)
@@ -40,6 +34,7 @@ def same_existent_file(a, b):
 
 class ActionInfo(archpkg.PkgNameInfo):
   def __new__(cls, path, action, four=None, five=None, pkgpath=None):
+    print(path, action, four)
     if four is not None:
       return super().__new__(cls, path, action, four, five)
     file = os.path.split(pkgpath or path)[1]
@@ -224,10 +219,11 @@ class RepoMan:
     self._do_remove(toremove)
 
 class EventHandler(pyinotify.ProcessEvent):
-  def my_init(self, config, wm, ioloop=None):
+  def my_init(self, filter_pkg, supported_archs, config, wm, ioloop=None):
+    self.filter_pkg = filter_pkg
     self.moved_away = {}
     self.repomans = {}
-    # TODO: use a expiring dict
+    # TODO: use an expiring dict
     self.our_links = set()
     self._ioloop = ioloop or IOLoop.instance()
 
@@ -255,7 +251,8 @@ class EventHandler(pyinotify.ProcessEvent):
                         (filename text unique,
                          pkgrepo text)''')
 
-    dirs = [os.path.join(base, x) for x in _supported_archs]
+    self._supported_archs = supported_archs
+    dirs = [os.path.join(base, x) for x in self._supported_archs]
     self.files = files = set()
     for d in dirs:
       os.makedirs(d, exist_ok=True)
@@ -276,10 +273,12 @@ class EventHandler(pyinotify.ProcessEvent):
     oldfiles.update(f[0] for f in self._db.execute('select filename from sigfiles where pkgrepo = ?', (self.name,)))
     oldfiles = {os.path.join(self._db_dir, f) for f in oldfiles}
 
-    for f in sorted(filterfalse(filterPkg, files - oldfiles), key=pkgsortkey):
+    for f in sorted(filterfalse(self.filter_pkg, files - oldfiles),
+                    key=pkgsortkey):
       self.dispatch(f, 'add')
 
-    for f in sorted(filterfalse(filterPkg, oldfiles - files), key=pkgsortkey):
+    for f in sorted(filterfalse(self.filter_pkg, oldfiles - files),
+                    key=pkgsortkey):
       self.dispatch(f, 'remove')
 
   def process_IN_CLOSE_WRITE(self, event):
@@ -352,7 +351,7 @@ class EventHandler(pyinotify.ProcessEvent):
         d = newd
 
     if self._symlink_any and act.arch == 'any':
-      for newarch in _supported_archs:
+      for newarch in self._supported_archs:
         if newarch == arch:
           # this file itself
           continue
@@ -453,10 +452,10 @@ class EventHandler(pyinotify.ProcessEvent):
       self._db.execute('''delete from sigfiles where filename = ? and pkgrepo = ?''',
                        (rpath, self.name))
 
-def filterPkg(path):
+def filter_pkg(regex, path):
   if isinstance(path, Event):
     path = path.pathname
-  return not _pkgfile_pat.search(path)
+  return not regex.search(path)
 
 def pkgsortkey(path):
   pkg = archpkg.PkgNameInfo.parseFilename(os.path.split(path)[1])
@@ -466,11 +465,20 @@ def repomon(config):
   wm = pyinotify.WatchManager()
   ioloop = IOLoop.instance()
 
+  supported_archs = config.get('supported-archs', 'i686 x86_64').split()
+  if 'any' not in supported_archs:
+    supported_archs.append('any')
+  # assume none of the archs has regex meta characters
+  regex = re.compile(r'(?:^|/)[^.].*-[^-]+-[\d.]+-(?:' + '|'.join(supported_archs) + r')\.pkg\.tar\.xz(?:\.sig)?$')
+
+  filter_func = partial(filter_pkg, regex)
   handler = EventHandler(
-    filterPkg,
-    config=config,
-    wm=wm,
-    ioloop=ioloop,
+    filter_func,
+    filter_pkg = filter_func,
+    supported_archs = supported_archs,
+    config = config,
+    wm = wm,
+    ioloop = ioloop,
   )
   return pyinotify.TornadoAsyncNotifier(
     wm,

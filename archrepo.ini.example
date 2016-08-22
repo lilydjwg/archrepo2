@@ -31,9 +31,12 @@ path: /home/lilydjwg/tmpfs/test
 # directory. Default is on.
 #auto-rename: on
 
+# What archs we support? The default is i686 and x86_64. And you can add more
+# like arm, armv6h, aarch64. Archs are separated by spaces.
+#supported-archs: i686 x86_64 arm
+
 # By enabling symlink-any, the server will automatically symlink the package
-# files of 'any' architecture to 'arm', 'armv6h', 'armv7h', 'aarch64',
-# 'i686' and 'x86_64'
+# files of 'any' architecture to supported archs.
 # Default is on.
 #symlink-any: on
 
