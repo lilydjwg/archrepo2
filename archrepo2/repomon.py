@@ -304,6 +304,10 @@ class EventHandler(pyinotify.ProcessEvent):
         logger.debug('Symlinked: %s', file)
         self.dispatch(file, 'add')
         self.files.add(file)
+    else:
+      logger.debug('Linked: %s', file)
+      self.dispatch(file, 'add')
+      self.files.add(file)
 
   def movedOut(self, event):
     logger.debug('Moved away: %s', event.pathname)
