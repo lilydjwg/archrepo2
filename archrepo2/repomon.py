@@ -34,7 +34,6 @@ def same_existent_file(a, b):
 
 class ActionInfo(archpkg.PkgNameInfo):
   def __new__(cls, path, action, four=None, five=None, pkgpath=None):
-    print(path, action, four)
     if four is not None:
       return super().__new__(cls, path, action, four, five)
     file = os.path.split(pkgpath or path)[1]
@@ -53,7 +52,7 @@ class RepoMan:
 
   def __init__(self, config, base, ioloop=None):
     self.action = []
-    self._ioloop = ioloop or IOLoop.instance()
+    self._ioloop = ioloop or IOLoop.current()
     self._base = base
 
     self._repo_dir = config.get('path')
@@ -225,7 +224,7 @@ class EventHandler(pyinotify.ProcessEvent):
     self.repomans = {}
     # TODO: use an expiring dict
     self.our_links = set()
-    self._ioloop = ioloop or IOLoop.instance()
+    self._ioloop = ioloop or IOLoop.current()
 
     base = config.get('path')
     dbname = config.get('info-db', os.path.join(base, 'pkginfo.db'))
@@ -467,7 +466,7 @@ def pkgsortkey(path):
 
 def repomon(config):
   wm = pyinotify.WatchManager()
-  ioloop = IOLoop.instance()
+  ioloop = IOLoop.current()
 
   supported_archs = config.get('supported-archs', 'i686 x86_64').split()
   if 'any' not in supported_archs:
@@ -484,8 +483,64 @@ def repomon(config):
     wm = wm,
     ioloop = ioloop,
   )
-  return pyinotify.TornadoAsyncNotifier(
+  ret = [pyinotify.TornadoAsyncNotifier(
     wm,
     ioloop,
     default_proc_fun=handler,
-  )
+  )]
+
+  if config.get('spool-directory'):
+    wm = pyinotify.WatchManager()
+    handler = SpoolHandler(
+      filter_func,
+      filter_pkg = filter_func,
+      path = config.get('spool-directory'),
+      dstpath = os.path.join(config.get('path'), 'any'),
+      wm = wm,
+    )
+    ret.append(pyinotify.TornadoAsyncNotifier(
+      wm, ioloop,
+      default_proc_fun=handler,
+    ))
+
+  return ret
+
+class SpoolHandler(pyinotify.ProcessEvent):
+  def my_init(self, filter_pkg, path, dstpath, wm):
+    self.filter_pkg = filter_pkg
+    self.dstpath = dstpath
+
+    files = set()
+    for f in os.listdir(path):
+      p = os.path.join(path, f)
+      if os.path.exists(p): # filter broken symlinks
+        files.add(p)
+
+    wm.add_watch(path, pyinotify.IN_CLOSE_WRITE | pyinotify.IN_CREATE |
+                 pyinotify.IN_MOVED_TO)
+    self._initial_update(files)
+
+  def _initial_update(self, files):
+    for f in sorted(filterfalse(self.filter_pkg, files),
+                    key=pkgsortkey):
+      self.dispatch(f)
+
+  def process_IN_CLOSE_WRITE(self, event):
+    logger.debug('Writing done: %s', event.pathname)
+    self.dispatch(event.pathname)
+
+  def process_IN_CREATE(self, event):
+    file = event.pathname
+    if os.path.islink(file):
+      logger.debug('Symlinked: %s', file)
+    else:
+      logger.debug('Linked: %s', file)
+    self.dispatch(file)
+
+  def process_IN_MOVED_TO(self, event):
+    logger.debug('Moved here: %s', event.pathname)
+    self.dispatch(event.pathname)
+
+  def dispatch(self, path):
+    filename = os.path.basename(path)
+    os.rename(path, os.path.join(self.dstpath, filename))

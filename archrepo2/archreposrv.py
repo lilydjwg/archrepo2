@@ -33,16 +33,18 @@ def main():
   config.read(conffile)
   repos = check_and_get_repos(config)
 
-  notifiers = [repomon(config[repo]) for repo in repos]
+  notifiers = []
+  for repo in repos:
+    notifiers.extend(repomon(config[repo]))
 
-  ioloop = IOLoop.instance()
+  ioloop = IOLoop.current()
   logger.info('starting archreposrv.')
   try:
     ioloop.start()
   except KeyboardInterrupt:
-    ioloop.close()
     for notifier in notifiers:
       notifier.stop()
+    ioloop.close()
     print()
 
 if __name__ == '__main__':
