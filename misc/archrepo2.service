@@ -1,0 +1,10 @@
+[Unit]
+Description=archrepo2 service for archlinuxcn repo
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/archreposrv /etc/archrepo2.ini
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
