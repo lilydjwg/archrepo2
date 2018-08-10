@@ -13,7 +13,7 @@ DEPENDENCIES
 
 -  Python, >= 3.3, with sqlite support
 -  setuptools
--  tornado, > 2.4.1
+-  tornado, > 3.1
 -  pyinotify, tested with 0.9.4
 
 NOTE

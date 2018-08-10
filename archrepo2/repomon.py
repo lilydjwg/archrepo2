@@ -50,9 +50,9 @@ class RepoMan:
   _cmd_queue = queue.Queue()
   _cmd_running = False
 
-  def __init__(self, config, base, ioloop=None):
+  def __init__(self, config, base):
     self.action = []
-    self._ioloop = ioloop or IOLoop.current()
+    self._ioloop = IOLoop.current()
     self._base = base
 
     self._repo_dir = config.get('path')
@@ -90,10 +90,10 @@ class RepoMan:
       return
 
     logger.info('Running cmd: %r', cmd)
-    # have to specify io_loop or we'll get error tracebacks in some versions
-    # of Tornado
+    # no longer have to specify io_loop in Tornado > 3.1. Let's drop them for
+    # Tornado >= 5
     try:
-      p = tornado.process.Subprocess(cmd, io_loop=self._ioloop)
+      p = tornado.process.Subprocess(cmd)
     except OSError:
       logger.error('failed to run command.', exc_info=True)
       self.run_command()
@@ -218,13 +218,13 @@ class RepoMan:
     self._do_remove(toremove)
 
 class EventHandler(pyinotify.ProcessEvent):
-  def my_init(self, filter_pkg, supported_archs, config, wm, ioloop=None):
+  def my_init(self, filter_pkg, supported_archs, config, wm):
     self.filter_pkg = filter_pkg
     self.moved_away = {}
     self.repomans = {}
     # TODO: use an expiring dict
     self.our_links = set()
-    self._ioloop = ioloop or IOLoop.current()
+    self._ioloop = IOLoop.current()
 
     base = config.get('path')
     dbname = config.get('info-db', os.path.join(base, 'pkginfo.db'))
@@ -466,7 +466,6 @@ def pkgsortkey(path):
 
 def repomon(config):
   wm = pyinotify.WatchManager()
-  ioloop = IOLoop.current()
 
   supported_archs = config.get('supported-archs', 'i686 x86_64').split()
   if 'any' not in supported_archs:
@@ -481,11 +480,9 @@ def repomon(config):
     supported_archs = supported_archs,
     config = config,
     wm = wm,
-    ioloop = ioloop,
   )
   ret = [pyinotify.TornadoAsyncNotifier(
     wm,
-    ioloop,
     default_proc_fun=handler,
   )]
 
@@ -499,8 +496,7 @@ def repomon(config):
       wm = wm,
     )
     ret.append(pyinotify.TornadoAsyncNotifier(
-      wm, ioloop,
-      default_proc_fun=handler,
+      wm, default_proc_fun=handler,
     ))
 
   return ret
