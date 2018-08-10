@@ -481,9 +481,11 @@ def repomon(config):
     config = config,
     wm = wm,
   )
+  ioloop = IOLoop.current()
   ret = [pyinotify.TornadoAsyncNotifier(
     wm,
     default_proc_fun=handler,
+    ioloop = ioloop,
   )]
 
   if config.get('spool-directory'):
@@ -497,6 +499,7 @@ def repomon(config):
     )
     ret.append(pyinotify.TornadoAsyncNotifier(
       wm, default_proc_fun=handler,
+      ioloop = ioloop,
     ))
 
   return ret
