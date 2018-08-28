@@ -18,7 +18,7 @@ def _add_to_dict(d, key, value):
 
 def readpkg(file):
   tar = tarfile.open(file)
-  for _ in range(3):
+  for _ in range(5):
     info = tar.next()
     if info and info.name == '.PKGINFO':
       break
