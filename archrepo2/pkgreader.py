@@ -18,10 +18,14 @@ def _add_to_dict(d, key, value):
 
 def readpkg(file):
   tar = tarfile.open(file)
-  info = tar.next()
-  if not info or info.name != '.PKGINFO':
+  for _ in range(3):
+    info = tar.next()
+    if info and info.name == '.PKGINFO':
+      break
+  else:
     logger.warn('%s is not a nice package!', file)
     info = '.PKGINFO' # have to look further
+
   f = tar.extractfile(info)
   data = f.read().decode()
   tar.close()
