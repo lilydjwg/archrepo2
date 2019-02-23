@@ -25,11 +25,9 @@ NOTE
 TODO
 ====
 
--  [high] singleton daemon
 -  [high] adding and then removing it before adding complete will result
    in not-in-database removing
 -  [middle] specify what architectures we have and don't require others
--  [low] fork to background
 -  [low] use one common command queue (now one each repo)
 -  [low] verify packages
 
