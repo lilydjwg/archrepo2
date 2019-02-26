@@ -167,6 +167,7 @@ class RepoMan:
 
 class EventHandler(pyinotify.ProcessEvent):
   _n_running = 0
+
   def my_init(
     self, filter_pkg, supported_archs, config, wm,
   ):
@@ -192,6 +193,8 @@ class EventHandler(pyinotify.ProcessEvent):
     self._ioloop = IOLoop.current()
 
     base = config.get('path')
+    self._lastupdate_file = os.path.join(base, 'lastupdate')
+
     dbname = config.get('info-db', os.path.join(base, 'pkginfo.db'))
     new_db = not os.path.exists(dbname)
     self._db = sqlite3.connect(dbname, isolation_level=None) # isolation_level=None means autocommit
@@ -424,6 +427,7 @@ class EventHandler(pyinotify.ProcessEvent):
     self._n_running -= 1
     if self._n_running == 0:
       self.send_notification()
+      self.update_lastupdate()
 
   def inc_running(self):
     self._n_running += 1
@@ -473,6 +477,11 @@ class EventHandler(pyinotify.ProcessEvent):
 
   def send_notification_null(self):
     logger.info('null notification sent.')
+
+  def update_lastupdate(self):
+    t = '%d\n' % time.time()
+    with open(self._lastupdate_file, 'w') as f:
+      f.write(t)
 
 def filter_pkg(regex, path):
   if isinstance(path, Event):
