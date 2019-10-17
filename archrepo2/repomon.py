@@ -21,7 +21,6 @@ from tornado.ioloop import IOLoop
 import tornado.process
 
 from .lib import archpkg
-from . import pkgreader
 from . import dbutil
 
 logger = logging.getLogger(__name__)
@@ -362,13 +361,7 @@ class EventHandler(pyinotify.ProcessEvent):
         except KeyError:
           owner = 'uid_%d' % stat.st_uid
 
-        try:
-          info = pkgreader.readpkg(act.path)
-        except:
-          logger.error('failed to read info for package %s', act.path, exc_info=True)
-          info = None
-        info = pickle.dumps(info)
-
+        info = None
         self._db.execute(
           '''insert or replace into pkginfo
              (filename, pkgrepo, pkgname, pkgarch, pkgver, forarch, state, owner, mtime, info) values
@@ -499,7 +492,7 @@ def repomon(config):
   if 'any' not in supported_archs:
     supported_archs.append('any')
   # assume none of the archs has regex meta characters
-  regex = re.compile(r'(?:^|/)[^.].*-[^-]+-[\d.]+-(?:' + '|'.join(supported_archs) + r')\.pkg\.tar\.xz(?:\.sig)?$')
+  regex = re.compile(r'(?:^|/)[^.].*-[^-]+-[\d.]+-(?:' + '|'.join(supported_archs) + r')\.pkg\.tar\.(?:xz|zst)(?:\.sig)?$')
 
   filter_func = partial(filter_pkg, regex)
   handler = EventHandler(
