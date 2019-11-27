@@ -22,7 +22,7 @@ path: /home/lilydjwg/tmpfs/test
 # If enabled, packages put into this directory will be moved into the repo.
 # This path should be on the same filesystem as the repo path
 # Should be used with auto-rename on
-#spool-directory: /tmp/repo
+spool-directory: /home/lilydjwg/tmpfs/spool
 
 # A database to store package info. Default to ${path}/pkginfo.db
 #info-db: /home/lilydjwg/tmpfs/test/pkginfo.db
