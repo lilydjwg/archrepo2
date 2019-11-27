@@ -12,7 +12,6 @@ import sqlite3
 import socket
 import time
 import hashlib
-import pickle
 from os.path import relpath
 
 import pyinotify
@@ -186,6 +185,7 @@ class EventHandler(pyinotify.ProcessEvent):
 
     self.filter_pkg = filter_pkg
     self.moved_away = {}
+    self.created = {}
     self.repomans = {}
     # TODO: use an expiring dict
     self.our_links = set()
@@ -271,12 +271,30 @@ class EventHandler(pyinotify.ProcessEvent):
         self.dispatch(file, 'add')
         self.files.add(file)
     else:
-      logger.debug('Linked: %s', file)
-      self.dispatch(file, 'add')
-      self.files.add(file)
+      logger.debug('Created: %s', file)
+      self.created[file] = self._ioloop.add_timeout(
+        self._ioloop.time() + 0.1,
+        partial(self.linked, file),
+      )
+
+  def process_IN_OPEN(self, event):
+    file = event.pathname
+    try:
+      timeout = self.created.pop(file)
+    except KeyError:
+      return
+
+    self._ioloop.remove_timeout(timeout)
+
+  def linked(self, file):
+    logger.debug('Linked: %s', file)
+    del self.created[file]
+    self.dispatch(file, 'add')
+    self.files.add(file)
 
   def movedOut(self, event):
     logger.debug('Moved away: %s', event.pathname)
+    del self.moved_away[event.cookie]
     self.dispatch(event.pathname, 'remove')
 
   def process_IN_MOVED_FROM(self, event):
@@ -292,7 +310,7 @@ class EventHandler(pyinotify.ProcessEvent):
     self.files.add(event.pathname)
 
     if event.cookie in self.moved_away:
-      self._ioloop.remove_timeout(self.moved_away[event.cookie])
+      self._ioloop.remove_timeout(self.moved_away.pop(event.cookie))
     else:
       logger.debug('Moved here: %s', event.pathname)
       self.dispatch(event.pathname, 'add')
@@ -529,6 +547,8 @@ class SpoolHandler(pyinotify.ProcessEvent):
   def my_init(self, filter_pkg, path, dstpath, wm):
     self.filter_pkg = filter_pkg
     self.dstpath = dstpath
+    self._ioloop = IOLoop.current()
+    self.created = {}
 
     files = set()
     for f in os.listdir(path):
@@ -537,7 +557,7 @@ class SpoolHandler(pyinotify.ProcessEvent):
         files.add(p)
 
     wm.add_watch(path, pyinotify.IN_CLOSE_WRITE | pyinotify.IN_CREATE |
-                 pyinotify.IN_MOVED_TO)
+                 pyinotify.IN_MOVED_TO | pyinotify.IN_OPEN)
     self._initial_update(files)
 
   def _initial_update(self, files):
@@ -553,8 +573,26 @@ class SpoolHandler(pyinotify.ProcessEvent):
     file = event.pathname
     if os.path.islink(file):
       logger.debug('Symlinked: %s', file)
+      self.dispatch(file)
     else:
-      logger.debug('Linked: %s', file)
+      logger.debug('Created: %s', file)
+      self.created[file] = self._ioloop.add_timeout(
+        self._ioloop.time() + 0.1,
+        partial(self.linked, file),
+      )
+
+  def process_IN_OPEN(self, event):
+    file = event.pathname
+    try:
+      timeout = self.created.pop(file)
+    except KeyError:
+      return
+
+    self._ioloop.remove_timeout(timeout)
+
+  def linked(self, file):
+    logger.debug('Linked: %s', file)
+    del self.created[file]
     self.dispatch(file)
 
   def process_IN_MOVED_TO(self, event):
