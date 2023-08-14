@@ -10,6 +10,7 @@ import queue
 import logging
 import sqlite3
 import socket
+import shutil
 import time
 import hashlib
 from os.path import relpath
@@ -331,7 +332,7 @@ class EventHandler(pyinotify.ProcessEvent):
       newd = os.path.join(base, act.arch)
       newpath = os.path.join(newd, file)
       if not same_existent_file(path, newpath):
-        os.rename(path, newpath)
+        shutil.move(path, newpath)
 
         act.path = newpath
         path = newpath
@@ -601,4 +602,4 @@ class SpoolHandler(pyinotify.ProcessEvent):
 
   def dispatch(self, path):
     filename = os.path.basename(path)
-    os.rename(path, os.path.join(self.dstpath, filename))
+    shutil.move(path, os.path.join(self.dstpath, filename))
