@@ -4,16 +4,14 @@ import subprocess
 import re
 from typing import List, Dict
 
-from packaging.version import Version # type: ignore
+from pyalpm import vercmp
 
 class PkgNameInfo(namedtuple('PkgNameInfo', 'name, version, release, arch')):
   def __lt__(self, other) -> bool:
     if self.name != other.name or self.arch != other.arch:
       return NotImplemented
     if self.version != other.version:
-      p = subprocess.Popen(["vercmp", self.version, other.version], stdout=subprocess.PIPE)
-      output = p.stdout.read()
-      return int(output) < 0
+      return vercmp(self.version, other.version) < 0
     return float(self.release) < float(other.release)
 
   def __gt__(self, other) -> bool:
