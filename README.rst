@@ -15,6 +15,7 @@ DEPENDENCIES
 -  setuptools
 -  tornado, > 3.1
 -  pyinotify, tested with 0.9.4
+-  pyalpm, tested with 0.10.6
 
 NOTE
 ====
