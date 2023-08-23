@@ -2,24 +2,16 @@ import os
 from collections import namedtuple
 import subprocess
 import re
-from typing import Tuple, List, Dict
+from typing import List, Dict
 
-from pkg_resources import parse_version as _parse_version
-from packaging.version import Version # type: ignore
-
-def parse_arch_version(v: str) -> Tuple[int, Version]:
-  if ':' in v:
-    epoch = int(v.split(':', 1)[0])
-  else:
-    epoch = 0
-  return epoch, _parse_version(v)
+from pyalpm import vercmp
 
 class PkgNameInfo(namedtuple('PkgNameInfo', 'name, version, release, arch')):
   def __lt__(self, other) -> bool:
     if self.name != other.name or self.arch != other.arch:
       return NotImplemented
     if self.version != other.version:
-      return parse_arch_version(self.version) < parse_arch_version(other.version)
+      return vercmp(self.version, other.version) < 0
     return float(self.release) < float(other.release)
 
   def __gt__(self, other) -> bool:
