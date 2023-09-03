@@ -57,4 +57,16 @@ notification-secret: JiUHuGY987G76djItfOskOj
 # If for any reason, you don't want actual database creation or update:
 #without-db: true
 
+# Whether to use shutil.move() to move files,
+# the default is to use os.rename() to move files.
+#
+# os. rename()
+# If src and dst are on same filesystem, rename src to dst.
+# If src and dst are on different filesystems, the operation will fail.
+#
+# shutil.move()
+# If the destination is on the current filesystem, then os.rename() is used.
+# Otherwise, src is copied to dst using shutil.copy2() and then removed.
+use-shutil-move: false
+
 # vim: se ft=dosini:
