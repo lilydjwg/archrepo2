@@ -4,6 +4,8 @@ A Tornado-inspired logging formatter, with displayed time with millisecond accur
 FYI: pyftpdlib also has a Tornado-style logger.
 '''
 
+from __future__ import annotations
+
 import sys
 import time
 import logging
@@ -55,6 +57,7 @@ class TornadoLogFormatter(logging.Formatter):
         'filename', 'exc_info', 'exc_text', 'created', 'funcName',
         'processName', 'process', 'msecs', 'relativeCreated', 'thread',
         'threadName', 'name', 'levelno', 'msg', 'pathname', 'stack_info',
+        'taskName',
       })
 
     if record.exc_info:
