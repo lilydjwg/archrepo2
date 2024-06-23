@@ -10,6 +10,7 @@ import queue
 import logging
 import sqlite3
 import socket
+import shutil
 import time
 import hashlib
 from os.path import relpath
@@ -167,7 +168,7 @@ class EventHandler(pyinotify.ProcessEvent):
   _n_running = 0
 
   def my_init(
-    self, filter_pkg, supported_archs, config, wm,
+    self, filter_pkg, supported_archs, config, wm, move_func,
   ):
 
     notification_type = config.get(
@@ -183,6 +184,7 @@ class EventHandler(pyinotify.ProcessEvent):
         notification_type.replace('-', '_'),
     )
 
+    self.move_func = move_func
     self.filter_pkg = filter_pkg
     self.moved_away = {}
     self.created = {}
@@ -331,7 +333,7 @@ class EventHandler(pyinotify.ProcessEvent):
       newd = os.path.join(base, act.arch)
       newpath = os.path.join(newd, file)
       if not same_existent_file(path, newpath):
-        os.rename(path, newpath)
+        self.move_func(path, newpath)
 
         act.path = newpath
         path = newpath
@@ -512,6 +514,13 @@ def repomon(config):
   # assume none of the archs has regex meta characters
   regex = re.compile(r'(?:^|/)[^.].*-[^-]+-[\d.]+-(?:' + '|'.join(supported_archs) + r')\.pkg\.tar\.(?:xz|zst)(?:\.sig)?$')
 
+  _use_shutil_move = config.getboolean('use-shutil-move', False)
+
+  if _use_shutil_move:
+    move_func = shutil.move
+  else:
+    move_func = os.rename
+
   filter_func = partial(filter_pkg, regex)
   handler = EventHandler(
     filter_func,
@@ -519,6 +528,7 @@ def repomon(config):
     supported_archs = supported_archs,
     config = config,
     wm = wm,
+    move_func = move_func
   )
   ioloop = IOLoop.current()
   ret = [pyinotify.TornadoAsyncNotifier(
@@ -535,6 +545,7 @@ def repomon(config):
       path = config.get('spool-directory'),
       dstpath = os.path.join(config.get('path'), 'any'),
       wm = wm,
+      move_func = move_func
     )
     ret.append(pyinotify.TornadoAsyncNotifier(
       wm, default_proc_fun=handler,
@@ -544,7 +555,8 @@ def repomon(config):
   return ret
 
 class SpoolHandler(pyinotify.ProcessEvent):
-  def my_init(self, filter_pkg, path, dstpath, wm):
+  def my_init(self, filter_pkg, path, dstpath, wm, move_func):
+    self.move_func = move_func
     self.filter_pkg = filter_pkg
     self.dstpath = dstpath
     self._ioloop = IOLoop.current()
@@ -601,4 +613,4 @@ class SpoolHandler(pyinotify.ProcessEvent):
 
   def dispatch(self, path):
     filename = os.path.basename(path)
-    os.rename(path, os.path.join(self.dstpath, filename))
+    self.move_func(path, os.path.join(self.dstpath, filename))
