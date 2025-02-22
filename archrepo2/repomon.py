@@ -226,7 +226,9 @@ class EventHandler(pyinotify.ProcessEvent):
         p = os.path.join(d, f)
         if os.path.exists(p): # filter broken symlinks
           files.add(p)
-      wm.add_watch(d, pyinotify.ALL_EVENTS)
+      wm.add_watch(d, pyinotify.IN_CLOSE_WRITE | pyinotify.IN_DELETE |
+                   pyinotify.IN_CREATE | pyinotify.IN_MOVED_FROM |
+                  pyinotify.IN_MOVED_TO | pyinotify.IN_OPEN)
       self.repomans[d] = RepoMan(config, d, self)
       self.name = self.repomans[d].name
       self._auto_rename = self.repomans[d]._auto_rename
