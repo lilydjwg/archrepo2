@@ -4,8 +4,6 @@ A Tornado-inspired logging formatter, with displayed time with millisecond accur
 FYI: pyftpdlib also has a Tornado-style logger.
 '''
 
-from __future__ import annotations
-
 import sys
 import time
 import logging
@@ -17,11 +15,7 @@ class TornadoLogFormatter(logging.Formatter):
     if color:
       import curses
       curses.setupterm()
-      if sys.hexversion < 0x30203f0:
-        fg_color = str(curses.tigetstr("setaf") or
-                   curses.tigetstr("setf") or "", "ascii")
-      else:
-        fg_color = curses.tigetstr("setaf") or curses.tigetstr("setf") or b""
+      fg_color = curses.tigetstr("setaf") or curses.tigetstr("setf") or b""
       self._colors = {
         logging.DEBUG: str(curses.tparm(fg_color, 4), # Blue
                      "ascii"),
@@ -86,7 +80,7 @@ def enable_pretty_logging(level=logging.DEBUG, handler=None, color=None):
         curses.setupterm()
         if curses.tigetnum("colors") > 0:
           color = True
-      except:
+      except Exception:
         import traceback
         traceback.print_exc()
   formatter = TornadoLogFormatter(color=color)
