@@ -7,7 +7,8 @@ setup(
   name = 'archrepo2',
   version = archrepo2.__version__,
   packages = find_packages(),
-  install_requires = ['tornado>2.4.1', 'pyinotify', 'pyalpm'],
+  python_requires = '>=3.14',
+  install_requires = ['pyinotify', 'pyalpm'],
   entry_points = {
     'console_scripts': [
       'archreposrv = archrepo2.archreposrv:main',

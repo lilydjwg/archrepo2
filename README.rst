@@ -11,10 +11,9 @@ Edit a copy of ``archrepo.ini.example`` and then run
 DEPENDENCIES
 ============
 
--  Python, >= 3.3, with sqlite support
+-  Python, >= 3.14, with sqlite support
 -  setuptools
--  tornado, > 3.1
--  pyinotify, tested with 0.9.4
+-  pyinotify, tested with 0.9.6
 -  pyalpm, tested with 0.10.6
 
 NOTE

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 
 import sys
+import signal
+import asyncio
 import configparser
 import logging
-
-from tornado.ioloop import IOLoop
 
 from .lib.nicelogger import enable_pretty_logging
 enable_pretty_logging(logging.DEBUG)
@@ -27,27 +27,32 @@ def check_and_get_repos(config):
 
   return repos
 
+async def amain(config):
+  notifiers = []
+  for repo in check_and_get_repos(config):
+    notifiers.extend(repomon(config[repo]))
+
+  logger.info('starting archreposrv.')
+  stop_event = asyncio.Event()
+  loop = asyncio.get_running_loop()
+  for sig in (signal.SIGINT, signal.SIGTERM):
+    loop.add_signal_handler(sig, stop_event.set)
+  try:
+    # Block until we get SIGINT/SIGTERM.
+    await stop_event.wait()
+  finally:
+    for notifier in notifiers:
+      notifier.stop()
+
 def main():
+  if len(sys.argv) != 2:
+    sys.exit('usage: archreposrv <config>')
   conffile = sys.argv[1]
   config = configparser.ConfigParser(default_section='multi')
   config.read(conffile)
-  repos = check_and_get_repos(config)
-
-  notifiers = []
-  for repo in repos:
-    notifiers.extend(repomon(config[repo]))
-
-  ioloop = IOLoop.current()
-  logger.info('starting archreposrv.')
-  try:
-    ioloop.start()
-  except KeyboardInterrupt:
-    for notifier in notifiers:
-      notifier.stop()
-    ioloop.close()
-    print()
+  asyncio.run(amain(config))
 
 if __name__ == '__main__':
-  if sys.version_info[:2] < (3, 3):
-    raise OSError('Python 3.3+ required.')
+  if sys.version_info < (3, 14):
+    raise OSError('Python 3.14+ required.')
   main()

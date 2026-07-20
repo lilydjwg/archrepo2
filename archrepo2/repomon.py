@@ -4,9 +4,9 @@ import os
 import re
 import pwd
 import stat
+import asyncio
 from functools import partial
 from itertools import filterfalse
-import queue
 import logging
 import sqlite3
 import socket
@@ -16,8 +16,6 @@ from os.path import relpath
 
 import pyinotify
 Event = pyinotify.Event
-from tornado.ioloop import IOLoop
-import tornado.process
 
 from .lib import archpkg
 from . import dbutil
@@ -44,13 +42,8 @@ class ActionInfo(archpkg.PkgNameInfo):
     return '<ActionInfo: %s %s>' % (self.action, self.path)
 
 class RepoMan:
-  _timeout = None
-  _cmd_queue = queue.Queue()
-  _cmd_running = False
-
   def __init__(self, config, base, siteman):
     self.action = []
-    self._ioloop = IOLoop.current()
     self._base = base
     self._siteman = siteman
 
@@ -65,42 +58,45 @@ class RepoMan:
     self._auto_rename = config.getboolean('auto-rename', True)
     self._symlink_any = config.getboolean('symlink-any', True)
 
+    self._cmd_queue: asyncio.Queue[tuple[list[str], tuple]] = asyncio.Queue()
+    self._consumer_task: asyncio.Task | None = None
+    self._timeout_task: asyncio.Task | None = None
+
   def queue_command(self, cmd, callbacks=None):
-    self._cmd_queue.put((cmd, callbacks))
-    if not self._cmd_running:
-      self.run_command()
+    was_empty = self._cmd_queue.empty()
+    self._cmd_queue.put_nowait((cmd, callbacks or ()))
+    if was_empty and (
+      self._consumer_task is None or self._consumer_task.done()
+    ):
+      self._consumer_task = asyncio.create_task(self._run_commands())
 
-  def run_command(self):
-    if not self._cmd_running:
-      self._siteman.inc_running()
-    self.__class__._cmd_running = True
+  async def _run_commands(self):
+    self._siteman.inc_running()
     try:
-      cmd, callbacks = self._cmd_queue.get_nowait()
-    except queue.Empty:
-      self.__class__._cmd_running = False
+      while True:
+        try:
+          cmd, callbacks = self._cmd_queue.get_nowait()
+        except asyncio.QueueEmpty:
+          break
+        status = await self._run_one(cmd)
+        if status == 0:
+          for cb in callbacks:
+            cb()
+          logger.info('previous command done.')
+        else:
+          logger.warning('previous command failed with status code %r.', status)
+    finally:
       self._siteman.dec_running()
-      return
 
+  async def _run_one(self, cmd):
     logger.info('Running cmd: %r', cmd)
-    # no longer have to specify io_loop in Tornado > 3.1. Let's drop them for
-    # Tornado >= 5
     try:
-      p = tornado.process.Subprocess(cmd)
+      proc = await asyncio.create_subprocess_exec(*cmd)
     except OSError:
       logger.error('failed to run command.', exc_info=True)
-      self.run_command()
-    else:
-      p.set_exit_callback(partial(self.command_done, callbacks))
-
-  def command_done(self, callbacks, status):
-    if status == 0:
-      if callbacks:
-        for cb in callbacks:
-          cb()
-      logger.info('previous command done.')
-    else:
-      logger.warn('previous command failed with status code %d.', status)
-    self.run_command()
+      return None
+    await proc.wait()
+    return proc.returncode
 
   def _do_cmd(self, cmd, items, callbacks):
     cmd1 = [cmd, self._db_file]
@@ -133,15 +129,19 @@ class RepoMan:
 
   def _action_pending(self, act):
     self.action.append(act)
-    if self._timeout:
-      self._ioloop.remove_timeout(self._timeout)
-    self._timeout = self._ioloop.add_timeout(
-      self._ioloop.time() + self._wait_time,
-      self.run,
-    )
+    if self._timeout_task is not None:
+      self._timeout_task.cancel()
+    self._timeout_task = asyncio.create_task(self._scheduled_run())
+
+  async def _scheduled_run(self):
+    try:
+      await asyncio.sleep(self._wait_time)
+    except asyncio.CancelledError:
+      return
+    self._timeout_task = None
+    self.run()
 
   def run(self):
-    self._timeout = None
     actions = self.action
     self.action = []
     actiondict = {}
@@ -153,10 +153,10 @@ class RepoMan:
         if oldact != act:
           # different packages, do the latter, but record the former
           try:
-              actiondict[act.name].callback(state=0)
-          except:
-              logger.exception('failed to run action %r.', actiondict[act.name])
-        # same package, do the latter, and discard the forter
+            actiondict[act.name].callback(state=0)
+          except Exception:
+            logger.exception('failed to run action %r.', actiondict[act.name])
+        # same package, do the latter, and discard the former
         actiondict[act.name] = act
     toadd = [(x.path, x.callback) for x in actiondict.values() if x.action == 'add']
     toremove = [(x.name, x.callback) for x in actiondict.values() if x.action == 'remove']
@@ -189,7 +189,6 @@ class EventHandler(pyinotify.ProcessEvent):
     self.repomans = {}
     # TODO: use an expiring dict
     self.our_links = set()
-    self._ioloop = IOLoop.current()
 
     base = config.get('path')
     self._lastupdate_file = os.path.join(base, 'lastupdate')
@@ -274,45 +273,45 @@ class EventHandler(pyinotify.ProcessEvent):
         self.files.add(file)
     else:
       logger.debug('Created: %s', file)
-      self.created[file] = self._ioloop.add_timeout(
-        self._ioloop.time() + 0.1,
-        partial(self.linked, file),
-      )
+      self.created[file] = asyncio.create_task(self._linked(file))
 
   def process_IN_OPEN(self, event):
     file = event.pathname
+    task = self.created.pop(file, None)
+    if task is not None:
+      task.cancel()
+
+  async def _linked(self, file):
     try:
-      timeout = self.created.pop(file)
-    except KeyError:
+      await asyncio.sleep(0.1)
+    except asyncio.CancelledError:
       return
-
-    self._ioloop.remove_timeout(timeout)
-
-  def linked(self, file):
-    logger.debug('Linked: %s', file)
     del self.created[file]
+    logger.debug('Linked: %s', file)
     self.dispatch(file, 'add')
     self.files.add(file)
 
-  def movedOut(self, event):
-    logger.debug('Moved away: %s', event.pathname)
+  async def _movedOut(self, event):
+    try:
+      await asyncio.sleep(0.1)
+    except asyncio.CancelledError:
+      return
     del self.moved_away[event.cookie]
+    logger.debug('Moved away: %s', event.pathname)
     self.dispatch(event.pathname, 'remove')
 
   def process_IN_MOVED_FROM(self, event):
-    self.moved_away[event.cookie] = self._ioloop.add_timeout(
-      self._ioloop.time() + 0.1,
-      partial(self.movedOut, event),
-    )
+    self.moved_away[event.cookie] = asyncio.create_task(self._movedOut(event))
     self.files.remove(event.pathname)
 
   def process_IN_MOVED_TO(self, event):
     if event.pathname in self.files:
-      logger.warn('Overwritten: %s', event.pathname)
+      logger.warning('Overwritten: %s', event.pathname)
     self.files.add(event.pathname)
 
-    if event.cookie in self.moved_away:
-      self._ioloop.remove_timeout(self.moved_away.pop(event.cookie))
+    task = self.moved_away.pop(event.cookie, None)
+    if task is not None:
+      task.cancel()
     else:
       logger.debug('Moved here: %s', event.pathname)
       self.dispatch(event.pathname, 'add')
@@ -453,7 +452,7 @@ class EventHandler(pyinotify.ProcessEvent):
       try:
         af, socktype, proto, canonname, sockaddr = socket.getaddrinfo(
           address, port, 0, socket.SOCK_DGRAM, 0, 0)[0]
-      except:
+      except Exception:
         logger.exception('failed to create socket to %r for notification',
                          (address, port))
         continue
@@ -506,6 +505,7 @@ def pkgsortkey(path):
   return (pkg.name, pkg.arch, pkg)
 
 def repomon(config):
+  loop = asyncio.get_running_loop()
   wm = pyinotify.WatchManager()
 
   supported_archs = config.get('supported-archs', 'i686 x86_64').split()
@@ -522,11 +522,10 @@ def repomon(config):
     config = config,
     wm = wm,
   )
-  ioloop = IOLoop.current()
-  ret = [pyinotify.TornadoAsyncNotifier(
+  ret = [pyinotify.AsyncioNotifier(
     wm,
+    loop,
     default_proc_fun=handler,
-    ioloop = ioloop,
   )]
 
   if config.get('spool-directory'):
@@ -538,9 +537,8 @@ def repomon(config):
       dstpath = os.path.join(config.get('path'), 'any'),
       wm = wm,
     )
-    ret.append(pyinotify.TornadoAsyncNotifier(
-      wm, default_proc_fun=handler,
-      ioloop = ioloop,
+    ret.append(pyinotify.AsyncioNotifier(
+      wm, loop, default_proc_fun=handler,
     ))
 
   return ret
@@ -549,7 +547,6 @@ class SpoolHandler(pyinotify.ProcessEvent):
   def my_init(self, filter_pkg, path, dstpath, wm):
     self.filter_pkg = filter_pkg
     self.dstpath = dstpath
-    self._ioloop = IOLoop.current()
     self.created = {}
 
     files = set()
@@ -578,23 +575,21 @@ class SpoolHandler(pyinotify.ProcessEvent):
       self.dispatch(file)
     else:
       logger.debug('Created: %s', file)
-      self.created[file] = self._ioloop.add_timeout(
-        self._ioloop.time() + 0.1,
-        partial(self.linked, file),
-      )
+      self.created[file] = asyncio.create_task(self._linked(file))
 
   def process_IN_OPEN(self, event):
     file = event.pathname
+    task = self.created.pop(file, None)
+    if task is not None:
+      task.cancel()
+
+  async def _linked(self, file):
     try:
-      timeout = self.created.pop(file)
-    except KeyError:
+      await asyncio.sleep(0.1)
+    except asyncio.CancelledError:
       return
-
-    self._ioloop.remove_timeout(timeout)
-
-  def linked(self, file):
-    logger.debug('Linked: %s', file)
     del self.created[file]
+    logger.debug('Linked: %s', file)
     self.dispatch(file)
 
   def process_IN_MOVED_TO(self, event):
