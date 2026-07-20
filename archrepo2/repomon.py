@@ -144,18 +144,29 @@ class RepoMan:
     self.action = []
     actiondict = {}
     for act in actions:
-      if act.name not in actiondict:
+      previous = actiondict.get(act.name)
+      if previous is None:
         actiondict[act.name] = act
+        continue
+      if previous == act:
+        # same version and action: take the latter (its callback is identical)
+        actiondict[act.name] = act
+        continue
+      # different versions of the same package: the file that still exists on
+      # disk is what the pacman repo db should end up with, so prefer the `add`
+      # action. Drop the superseded action by invoking its callback with
+      # state=0, which merely updates pkginfo without queueing `repo-remove`
+      # (that would erase the package from the pacman db by name).
+      if act.action == 'add' or previous.action == 'remove':
+        superseded, winner = previous, act
       else:
-        oldact = actiondict[act.name]
-        if oldact != act:
-          # different packages, do the latter, but record the former
-          try:
-            actiondict[act.name].callback(state=0)
-          except Exception:
-            logger.exception('failed to run action %r.', actiondict[act.name])
-        # same package, do the latter, and discard the former
-        actiondict[act.name] = act
+        # previous is add, act is remove: keep the add, drop the remove
+        superseded, winner = act, previous
+      try:
+        superseded.callback(state=0)
+      except Exception:
+        logger.exception('failed to run action %r.', superseded)
+      actiondict[act.name] = winner
     toadd = [(x.path, x.callback) for x in actiondict.values() if x.action == 'add']
     toremove = [(x.name, x.callback) for x in actiondict.values() if x.action == 'remove']
     self._do_add(toadd)
