@@ -3,57 +3,57 @@ base_dir: /var/cache/pacman/pkg
 wait
 
 # x86_64 packages
-add: any zip-3.0-3-x86_64.pkg.tar.xz
+add: any xorg-xev-1.2.7-1-x86_64.pkg.tar.zst
 wait
-checky: x86_64/zip-3.0-3-x86_64.pkg.tar.xz
-checkp: x86_64 zip=3.0-3
+checky: x86_64/xorg-xev-1.2.7-1-x86_64.pkg.tar.zst
+checkp: x86_64 xorg-xev=1.2.7-1
 
 # 'any' package
-add: x86_64 youtube-dl-2014.01.28.1-1-any.pkg.tar.xz
+add: x86_64 wayland-protocols-1.48-1-any.pkg.tar.zst
 wait
-checky: any/youtube-dl-2014.01.28.1-1-any.pkg.tar.xz
-checky: i686/youtube-dl-2014.01.28.1-1-any.pkg.tar.xz
-checky: x86_64/youtube-dl-2014.01.28.1-1-any.pkg.tar.xz
-checkp: x86_64 youtube-dl=2014.01.28.1-1
-checkp: i686 youtube-dl=2014.01.28.1-1
+checky: any/wayland-protocols-1.48-1-any.pkg.tar.zst
+checky: i686/wayland-protocols-1.48-1-any.pkg.tar.zst
+checky: x86_64/wayland-protocols-1.48-1-any.pkg.tar.zst
+checkp: x86_64 wayland-protocols=1.48-1
+checkp: i686 wayland-protocols=1.48-1
 
 # update a package
-add: any youtube-dl-2014.01.29-1-any.pkg.tar.xz
+add: any wayland-protocols-1.49-1-any.pkg.tar.zst
 wait
-checky: any/youtube-dl-2014.01.29-1-any.pkg.tar.xz
-checky: i686/youtube-dl-2014.01.29-1-any.pkg.tar.xz
-checky: x86_64/youtube-dl-2014.01.29-1-any.pkg.tar.xz
-checkp: x86_64 youtube-dl=2014.01.29-1
-checkp: i686 youtube-dl=2014.01.29-1
+checky: any/wayland-protocols-1.49-1-any.pkg.tar.zst
+checky: i686/wayland-protocols-1.49-1-any.pkg.tar.zst
+checky: x86_64/wayland-protocols-1.49-1-any.pkg.tar.zst
+checkp: x86_64 wayland-protocols=1.49-1
+checkp: i686 wayland-protocols=1.49-1
 
 # downgrade and remove
-add: x86_64 youtube-dl-2014.01.29-1-any.pkg.tar.xz
-remove: any youtube-dl-2014.01.28.1-1-any.pkg.tar.xz
+add: x86_64 wayland-protocols-1.48-1-any.pkg.tar.zst
+remove: any wayland-protocols-1.49-1-any.pkg.tar.zst
 wait
-checkn: any/youtube-dl-2014.01.28.1-1-any.pkg.tar.xz
-checkn: i686/youtube-dl-2014.01.28.1-1-any.pkg.tar.xz
-checkn: x86_64/youtube-dl-2014.01.28.1-1-any.pkg.tar.xz
-checkp: x86_64 youtube-dl=2014.01.29-1
-checkp: i686 youtube-dl=2014.01.29-1
+checkn: any/wayland-protocols-1.49-1-any.pkg.tar.zst
+checkn: i686/wayland-protocols-1.49-1-any.pkg.tar.zst
+checkn: x86_64/wayland-protocols-1.49-1-any.pkg.tar.zst
+checkp: x86_64 wayland-protocols=1.48-1
+checkp: i686 wayland-protocols=1.48-1
 
 # completely remove packages
-remove: any youtube-dl-2014.01.29-1-any.pkg.tar.xz
-remove: x86_64 zip-3.0-3-x86_64.pkg.tar.xz
+remove: any wayland-protocols-1.48-1-any.pkg.tar.zst
+remove: x86_64 xorg-xev-1.2.7-1-x86_64.pkg.tar.zst
 wait
-checkn: any/youtube-dl-2014.01.29-1-any.pkg.tar.xz
-checkn: i686/youtube-dl-2014.01.29-1-any.pkg.tar.xz
-checkn: x86_64/youtube-dl-2014.01.29-1-any.pkg.tar.xz
-checkp: x86_64 youtube-dl=null
-checkp: i686 youtube-dl=null
-checkp: any youtube-dl=null
-checkp: i686 zip=null
-checkp: x86_64 zip=null
+checkn: any/wayland-protocols-1.48-1-any.pkg.tar.zst
+checkn: i686/wayland-protocols-1.48-1-any.pkg.tar.zst
+checkn: x86_64/wayland-protocols-1.48-1-any.pkg.tar.zst
+checkp: x86_64 wayland-protocols=null
+checkp: i686 wayland-protocols=null
+checkp: any wayland-protocols=null
+checkp: i686 xorg-xev=null
+checkp: x86_64 xorg-xev=null
 
 # add then, while adding, remove it
 # look at the log carefully!
-add: x86_64 linux-3.12.8-1-x86_64.pkg.tar.xz
+add: x86_64 qt6-webengine-6.11.1-4-x86_64.pkg.tar.zst
 racing-wait
-remove: x86_64 linux-3.12.8-1-x86_64.pkg.tar.xz
+remove: x86_64 qt6-webengine-6.11.1-4-x86_64.pkg.tar.zst
 wait
-checkn: x86_64/linux-3.12.8-1-x86_64.pkg.tar.xz
-checkp: x86_64 linux=null
+checkn: x86_64/qt6-webengine-6.11.1-4-x86_64.pkg.tar.zst
+checkp: x86_64 qt6-webengine=null

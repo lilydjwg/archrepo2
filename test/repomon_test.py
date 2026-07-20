@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 
 import os
 import sys
@@ -9,7 +9,7 @@ import logging
 import shutil
 import tarfile
 
-from myutils import enable_pretty_logging
+from nicelogger import enable_pretty_logging
 enable_pretty_logging(logging.DEBUG)
 
 class Command:
