@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "archrepo2"
+description = "Arch Linux repository manager"
+license = "MIT"
+authors = [
+  {name = "lilydjwg", email = "lilydjwg@gmail.com"},
+]
+keywords = ["archlinux", "linux"]
+requires-python = ">=3.14"
+dependencies = [
+  "pyinotify",
+  "pyalpm",
+]
+dynamic = ["version"]
+
+[project.urls]
+Homepage = "https://github.com/lilydjwg/archrepo2"
+
+[project.scripts]
+archreposrv = "archrepo2.archreposrv:main"
+
+[tool.setuptools.dynamic]
+version = {attr = "archrepo2.__version__"}
+
+[tool.setuptools.packages.find]
+include = ["archrepo2*"]

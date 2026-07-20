@@ -3,7 +3,7 @@ USAGE
 
 Install::
 
-  python3 setup.py install
+  pip3 install .
 
 Edit a copy of ``archrepo.ini.example`` and then run
 ``archreposrv <config>``.
